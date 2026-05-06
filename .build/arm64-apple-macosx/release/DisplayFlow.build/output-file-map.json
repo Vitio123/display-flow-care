@@ -1,0 +1,37 @@
+{
+  "": {
+    "dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/DisplayFlow.d",
+    "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/DisplayFlow.o",
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/primary.swiftdeps"
+  },
+  "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift": {
+    "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.swift.o",
+    "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher~partial.swiftmodule",
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.swiftdeps",
+    "diagnostics": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.dia"
+  },
+  "/Users/vitio/display flow + care/Sources/DisplayFlow/Overlay.swift": {
+    "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.swift.o",
+    "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay~partial.swiftmodule",
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.swiftdeps",
+    "diagnostics": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.dia"
+  },
+  "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift": {
+    "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.swift.o",
+    "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings~partial.swiftmodule",
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.swiftdeps",
+    "diagnostics": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.dia"
+  },
+  "/Users/vitio/display flow + care/Sources/DisplayFlow/UI.swift": {
+    "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/UI.swift.o",
+    "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/UI~partial.swiftmodule",
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/UI.swiftdeps",
+    "diagnostics": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/UI.dia"
+  },
+  "/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift": {
+    "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/main.swift.o",
+    "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/main.swiftdeps",
+    "diagnostics": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/main.dia"
+  }
+}

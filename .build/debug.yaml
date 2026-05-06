@@ -1,0 +1,81 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "DisplayFlow-arm64-apple-macosx-debug.exe": ["<DisplayFlow-arm64-apple-macosx-debug.exe>"]
+  "DisplayFlow-arm64-apple-macosx-debug.module": ["<DisplayFlow-arm64-apple-macosx-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<DisplayFlow-arm64-apple-macosx-debug.exe>","<DisplayFlow-arm64-apple-macosx-debug.module>"]
+  "test": ["<DisplayFlow-arm64-apple-macosx-debug.exe>","<DisplayFlow-arm64-apple-macosx-debug.module>"]
+default: "main"
+nodes:
+  "/Users/vitio/display flow + care/Sources/DisplayFlow/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow":
+    is-mutated: true
+commands:
+  "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow-entitlement.plist"]
+    description: "Write auxiliary file /Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow-entitlement.plist"
+
+  "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift"]
+    outputs: ["/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/sources"]
+    description: "Write auxiliary file /Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/sources"
+
+  "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/main.swift.o"]
+    outputs: ["/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.product/Objects.LinkFileList"
+
+  "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<DisplayFlow-arm64-apple-macosx-debug.exe>":
+    tool: phony
+    inputs: ["<DisplayFlow-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    outputs: ["<DisplayFlow-arm64-apple-macosx-debug.exe>"]
+
+  "<DisplayFlow-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/main.swift.o","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/Modules/DisplayFlow.swiftmodule"]
+    outputs: ["<DisplayFlow-arm64-apple-macosx-debug.module>"]
+
+  "C.DisplayFlow-arm64-apple-macosx-debug.exe":
+    tool: shell
+    inputs: ["/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/main.swift.o","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.product/Objects.LinkFileList"]
+    outputs: ["/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/DisplayFlow"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug","-o","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow","-module-name","DisplayFlow","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_DisplayFlow_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx12.0","-Xlinker","-add_ast_path","-Xlinker","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/Modules/DisplayFlow.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.DisplayFlow-arm64-apple-macosx-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow-entitlement.plist"]
+    outputs: ["<DisplayFlow-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/DisplayFlow"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow-entitlement.plist","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow"]
+
+  "C.DisplayFlow-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/sources"]
+    outputs: ["/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/main.swift.o","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/Modules/DisplayFlow.swiftmodule"]
+    description: "Compiling Swift Module 'DisplayFlow' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","DisplayFlow","-emit-dependencies","-emit-module","-emit-module-path","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/Modules/DisplayFlow.swiftmodule","-output-file-map","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/output-file-map.json","-incremental","-c","@/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/sources","-I","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx12.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j8","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","DisplayFlow_main","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","display_flow___care"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/vitio/display flow + care/Sources/DisplayFlow/","/Users/vitio/display flow + care/Package.swift","/Users/vitio/display flow + care/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/primary.swiftdeps"
+  },
+  "/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift": {
+    "dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/main.d",
+    "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/main.swift.o",
+    "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/main.swiftdeps",
+    "diagnostics": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/debug/DisplayFlow.build/main.dia"
+  }
+}

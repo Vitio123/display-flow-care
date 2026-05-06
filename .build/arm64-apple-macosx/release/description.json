@@ -1,0 +1,295 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.DisplayFlow-arm64-apple-macosx-release.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/sources",
+      "importPath" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/Overlay.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/UI.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "DisplayFlow",
+      "moduleOutputPath" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/Modules/DisplayFlow.swiftmodule",
+      "objects" : [
+        "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.swift.o",
+        "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.swift.o",
+        "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.swift.o",
+        "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/UI.swift.o",
+        "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx12.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "8",
+        "-serialize-diagnostics",
+        "-O",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "DisplayFlow_main",
+        "-swift-version",
+        "5",
+        "-I",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-L",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-plugin-path",
+        "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "display_flow___care"
+      ],
+      "outputFileMapPath" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/UI.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/Modules/DisplayFlow.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift",
+        "/Users/vitio/display flow + care/Sources/DisplayFlow/Overlay.swift",
+        "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift",
+        "/Users/vitio/display flow + care/Sources/DisplayFlow/UI.swift",
+        "/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift"
+      ],
+      "tempsPath" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build",
+      "wholeModuleOptimization" : true
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "DisplayFlow" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "DisplayFlow",
+      "-package-name",
+      "display_flow___care",
+      "-c",
+      "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift",
+      "/Users/vitio/display flow + care/Sources/DisplayFlow/Overlay.swift",
+      "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift",
+      "/Users/vitio/display flow + care/Sources/DisplayFlow/UI.swift",
+      "/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift",
+      "-I",
+      "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx12.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "8",
+      "-serialize-diagnostics",
+      "-O",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "DisplayFlow_main",
+      "-swift-version",
+      "5",
+      "-I",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-L",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-plugin-path",
+      "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "display_flow___care",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "DisplayFlow" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/Overlay.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/UI.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/sources"
+    },
+    "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/UI.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/main.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.product/Objects.LinkFileList"
+    },
+    "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt"
+    }
+  }
+}

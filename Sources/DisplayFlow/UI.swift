@@ -353,8 +353,17 @@ struct PreferencesView: View {
         VStack(alignment: .leading, spacing: 14) {
             Toggle(isOn: $settings.pauseOnMedia) {
                 careRow(symbol: "play.rectangle.fill",
-                        title: "Pause when media is playing",
-                        subtitle: "Detects video, voice calls (Discord, FaceTime), music, and full-screen apps.")
+                        title: "Pause while a video is on screen",
+                        subtitle: "Full-screen, picture-in-picture, or in a tab — any visible video. Audio-only apps (music, voice calls) won't pause the dimming.")
+            }
+            .toggleStyle(.switch)
+
+            Divider().opacity(0.4)
+
+            Toggle(isOn: $settings.pixelShift) {
+                careRow(symbol: "arrow.up.and.down.and.arrow.left.and.right",
+                        title: "Pixel shift",
+                        subtitle: "Subtly drifts the overlay ±1 pixel every minute so the menu-bar cover doesn't always sit on the same physical pixels.")
             }
             .toggleStyle(.switch)
 

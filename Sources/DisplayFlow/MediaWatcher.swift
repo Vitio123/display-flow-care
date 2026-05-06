@@ -1,15 +1,16 @@
 import Foundation
 import IOKit
 import IOKit.pwr_mgt
-import CoreAudio
 
-/// Polls three signals:
+/// Polls two signals:
 ///  1. IOKit power assertions ("PreventUserIdleDisplaySleep" /
-///     "NoDisplaySleepAssertion") — video players, video calls with the
-///     camera on, full-screen presentations.
-///  2. CoreAudio default-output activity — catches the cases the power
-///     assertion misses: Discord voice calls, Spotify, FaceTime audio, etc.
-///  3. HIDIdleTime from IOHIDSystem — seconds since last keyboard/mouse input,
+///     "NoDisplaySleepAssertion"). These are the canonical "there is video on
+///     screen" signal on macOS — video players, browsers playing video (full
+///     screen, picture-in-picture, or in a tab), video calls with the camera
+///     on, and full-screen apps all create them. Audio-only apps (Spotify,
+///     Discord voice without video) do NOT create these, so when nothing is
+///     visibly playing the overlay is free to dim normally.
+///  2. HIDIdleTime from IOHIDSystem — seconds since last keyboard/mouse input,
 ///     used by the "blackout when idle" care setting.
 final class MediaWatcher: ObservableObject {
     @Published private(set) var mediaPlaying: Bool = false
@@ -32,7 +33,7 @@ final class MediaWatcher: ObservableObject {
     }
 
     private func poll() {
-        let media = Self.queryMediaAssertions() || Self.audioOutputActive()
+        let media = Self.queryMediaAssertions()
         let idle = Self.systemIdleSeconds()
         if media != mediaPlaying { mediaPlaying = media }
         idleSeconds = idle
@@ -47,33 +48,6 @@ final class MediaWatcher: ObservableObject {
         let preventDisplaySleep = (dict["PreventUserIdleDisplaySleep"] ?? 0) > 0
         let noDisplaySleep      = (dict["NoDisplaySleepAssertion"] ?? 0) > 0
         return preventDisplaySleep || noDisplaySleep
-    }
-
-    /// True if the default audio output device currently has IO running —
-    /// i.e. some process is actively producing sound. Catches Discord voice
-    /// calls, Spotify, music apps, etc. that don't bother to hold a display
-    /// sleep assertion.
-    static func audioOutputActive() -> Bool {
-        var deviceID = AudioDeviceID(0)
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        var addr = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        let r1 = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &addr, 0, nil, &size, &deviceID)
-        guard r1 == noErr, deviceID != 0 else { return false }
-
-        var running = UInt32(0)
-        size = UInt32(MemoryLayout<UInt32>.size)
-        addr.mSelector = kAudioDevicePropertyDeviceIsRunningSomewhere
-        addr.mScope    = kAudioObjectPropertyScopeOutput
-
-        let r2 = AudioObjectGetPropertyData(
-            deviceID, &addr, 0, nil, &size, &running)
-        return r2 == noErr && running != 0
     }
 
     /// Reads HIDIdleTime from IOHIDSystem; returns seconds since last input.

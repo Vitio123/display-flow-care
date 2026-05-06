@@ -7,29 +7,38 @@ final class OverlayWindow {
     let window: NSWindow
     let displayID: CGDirectDisplayID
     let screenRef: NSScreen
+    /// Slightly larger than `screen.frame` so a small pixel-shift offset
+    /// doesn't expose the screen edge.
+    let baseFrame: NSRect
     private var pendingShow: DispatchWorkItem?
+    /// Desired visibility (intent), set immediately when caller asks. Used
+    /// instead of `alphaValue` to drive scheduling, because `alphaValue`
+    /// lags behind during the fade animation.
+    private(set) var isVisible: Bool = false
+    var hasPendingShow: Bool { pendingShow != nil }
 
     init(screen: NSScreen, style: DimStyle) {
         let key = NSDeviceDescriptionKey("NSScreenNumber")
         self.displayID = (screen.deviceDescription[key] as? NSNumber)?.uint32Value ?? 0
         self.screenRef = screen
+        self.baseFrame = screen.frame.insetBy(dx: -4, dy: -4)
 
         let view: NSView
         switch style {
         case .blur:
-            let v = NSVisualEffectView(frame: screen.frame)
+            let v = NSVisualEffectView(frame: NSRect(origin: .zero, size: baseFrame.size))
             v.material = .fullScreenUI
             v.blendingMode = .behindWindow
             v.state = .active
             view = v
         case .black, .white:
-            let v = NSView(frame: screen.frame)
+            let v = NSView(frame: NSRect(origin: .zero, size: baseFrame.size))
             v.wantsLayer = true
             v.layer?.backgroundColor = (style == .white ? NSColor.white : NSColor.black).cgColor
             view = v
         }
 
-        let w = NSWindow(contentRect: screen.frame,
+        let w = NSWindow(contentRect: baseFrame,
                          styleMask: .borderless,
                          backing: .buffered,
                          defer: false,
@@ -50,8 +59,18 @@ final class OverlayWindow {
 
     func close() { window.orderOut(nil) }
 
+    /// Apply a (dx, dy) pixel offset relative to the inflated base frame.
+    /// Keeps the overlay covering the full screen because base is 4px larger.
+    func applyOffset(_ offset: CGSize) {
+        var f = baseFrame
+        f.origin.x += offset.width
+        f.origin.y += offset.height
+        window.setFrame(f, display: false)
+    }
+
     func setVisible(_ visible: Bool, opacity: CGFloat, duration: Double) {
         pendingShow?.cancel(); pendingShow = nil
+        isVisible = visible
         let target: CGFloat = visible ? opacity : 0
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = duration
@@ -60,21 +79,29 @@ final class OverlayWindow {
         }
     }
 
+    /// Schedule a deferred show after `delay` seconds. If a show is already
+    /// pending, this is a no-op — that's what makes the leave-delay actually
+    /// stick when `tick()` runs at 30 Hz.
     func scheduleShow(after delay: TimeInterval,
                       opacity: CGFloat,
                       duration: Double,
                       condition: @escaping () -> Bool) {
-        pendingShow?.cancel()
+        guard pendingShow == nil else { return }
+        if delay <= 0 {
+            if condition() {
+                setVisible(true, opacity: opacity, duration: duration)
+            }
+            return
+        }
         let work = DispatchWorkItem { [weak self] in
-            guard let self = self, condition() else { return }
-            self.setVisible(true, opacity: opacity, duration: duration)
+            guard let self = self else { return }
+            self.pendingShow = nil
+            if condition() {
+                self.setVisible(true, opacity: opacity, duration: duration)
+            }
         }
         pendingShow = work
-        if delay <= 0 {
-            DispatchQueue.main.async(execute: work)
-        } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     func cancelPending() {
@@ -96,6 +123,9 @@ final class TopBarWindow {
 
     /// Height of the menu bar strip on this display.
     let height: CGFloat
+    /// Inflated frame so a small pixel-shift offset never exposes the menu
+    /// bar at the edges.
+    let baseFrame: NSRect
 
     init(screen: NSScreen, style: DimStyle) {
         let key = NSDeviceDescriptionKey("NSScreenNumber")
@@ -107,10 +137,14 @@ final class TopBarWindow {
         let h = max(28, measured + 2)
         self.height = h
 
-        let frame = NSRect(x: screen.frame.minX,
-                           y: screen.frame.maxY - h,
-                           width: screen.frame.width,
-                           height: h)
+        // Inflate horizontally and vertically so ±1px shifts never reveal
+        // the menu bar pixels at the borders. We extend up (off-screen, gets
+        // clipped) and down (covers a hair more user content).
+        let frame = NSRect(x: screen.frame.minX - 4,
+                           y: screen.frame.maxY - h - 4,
+                           width: screen.frame.width + 8,
+                           height: h + 8)
+        self.baseFrame = frame
         let view: NSView
         switch style {
         case .blur:
@@ -146,6 +180,13 @@ final class TopBarWindow {
     var alphaValue: CGFloat { window.alphaValue }
 
     func close() { window.orderOut(nil) }
+
+    func applyOffset(_ offset: CGSize) {
+        var f = baseFrame
+        f.origin.x += offset.width
+        f.origin.y += offset.height
+        window.setFrame(f, display: false)
+    }
 
     func setVisible(_ visible: Bool, opacity: CGFloat = 1.0, duration: Double) {
         let target: CGFloat = visible ? opacity : 0
@@ -189,6 +230,32 @@ final class OverlayController: ObservableObject {
     private var unsavedSeconds: Double = 0
     private var lastSaved: Date = .distantPast
 
+    // Pixel-shift cycle. Walks a 3×3 neighborhood around (0,0) so the overlay
+    // boundary lands on slightly different physical pixels each minute.
+    private let shiftPattern: [CGSize] = [
+        .init(width:  0, height:  0),
+        .init(width:  1, height:  0),
+        .init(width:  1, height:  1),
+        .init(width:  0, height:  1),
+        .init(width: -1, height:  1),
+        .init(width: -1, height:  0),
+        .init(width: -1, height: -1),
+        .init(width:  0, height: -1),
+        .init(width:  1, height: -1),
+    ]
+    private var shiftIndex: Int = 0
+    private var lastShiftAt: Date = .distantPast
+    private let shiftIntervalSeconds: TimeInterval = 60
+
+    // Mission-Control / space-switch detection. The cursor "warps" between
+    // displays during these animations and would otherwise yank the overlay
+    // off and on again — annoying for someone who hits Ctrl+Up all the time.
+    // While frozen, the cursor-follow loop is skipped and overlays hold
+    // whatever state they were in.
+    private var lastCursorPos: NSPoint = NSEvent.mouseLocation
+    private var freezeUntil: Date = .distantPast
+    private var spaceObserver: NSObjectProtocol?
+
     init() {
         mediaWatcher.start()
         rebuild()
@@ -200,6 +267,16 @@ final class OverlayController: ObservableObject {
         protectionObserver = NotificationCenter.default.addObserver(
             forName: .protectionChanged, object: nil, queue: .main
         ) { [weak self] _ in self?.rebuild() }
+
+        // Real space switches (Ctrl+Left/Right, swipe, click in Mission
+        // Control) come through here — pause the cursor-follow loop briefly
+        // so the overlay doesn't flash.
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.freezeUntil = Date().addingTimeInterval(1.5)
+        }
 
         // Rebuild overlays on style change (NSVisualEffectView vs solid).
         settings.$style
@@ -213,6 +290,19 @@ final class OverlayController: ObservableObject {
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.rebuild() }
+            .store(in: &cancellables)
+
+        // Reset offsets when pixel shift is toggled off.
+        settings.$pixelShift
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if !enabled {
+                    self.shiftIndex = 0
+                    self.applyShift(.zero)
+                }
+            }
             .store(in: &cancellables)
 
         timer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
@@ -234,6 +324,24 @@ final class OverlayController: ObservableObject {
             ? protectedScreens.map { TopBarWindow(screen: $0, style: settings.style) }
             : []
         protectedCount = overlays.count
+        // Re-apply current shift so freshly created windows don't snap back to (0,0).
+        applyShift(shiftPattern[shiftIndex])
+    }
+
+    /// Apply a pixel offset to all overlay and top-bar windows.
+    private func applyShift(_ offset: CGSize) {
+        overlays.forEach { $0.applyOffset(offset) }
+        topBars.forEach  { $0.applyOffset(offset) }
+    }
+
+    /// Advance the pixel-shift cycle if enough time has elapsed.
+    private func pixelShiftTick() {
+        guard settings.pixelShift else { return }
+        let now = Date()
+        if now.timeIntervalSince(lastShiftAt) < shiftIntervalSeconds { return }
+        lastShiftAt = now
+        shiftIndex = (shiftIndex + 1) % shiftPattern.count
+        applyShift(shiftPattern[shiftIndex])
     }
 
     private func isCursorInTopStrip(displayID: CGDirectDisplayID) -> Bool {
@@ -281,6 +389,8 @@ final class OverlayController: ObservableObject {
     }
 
     private func tick() {
+        pixelShiftTick()
+
         let s = settings
         let opacity = CGFloat(s.opacity)
         let dur = s.fadeDuration
@@ -335,16 +445,46 @@ final class OverlayController: ObservableObject {
             return
         }
 
+        // Cursor warp detection. Anything moving > 1500px in a single 33ms
+        // tick is almost certainly a system warp (Mission Control, app
+        // switcher) — real mouse motion peaks around 5–8 k px/s. Freeze the
+        // cursor-follow loop for 1.5s so the overlay doesn't dim-then-undim.
+        let now = Date()
+        let m = NSEvent.mouseLocation
+        let dx = m.x - lastCursorPos.x
+        let dy = m.y - lastCursorPos.y
+        if (dx * dx + dy * dy).squareRoot() > 1500 {
+            freezeUntil = now.addingTimeInterval(1.5)
+        }
+        lastCursorPos = m
+
+        if now < freezeUntil {
+            // Hold current state. Stats keep ticking if anything was already
+            // visible, top bars keep doing their own cursor-aware thing.
+            if overlays.contains(where: { $0.isVisible }) {
+                accrueProtectedTime()
+            }
+            showTopBars()
+            updateState(.active(protectedCount: protectedCount))
+            return
+        }
+
         // Cursor follow
         let cursorID = cursorDisplayID()
         var anyDimmed = false
         for w in overlays {
             if w.displayID == cursorID {
-                w.cancelPending()
-                w.setVisible(false, opacity: opacity, duration: dur)
+                // Cursor is here — make sure overlay is hidden and any pending
+                // show is canceled. Only act on transitions.
+                if w.isVisible || w.hasPendingShow {
+                    w.setVisible(false, opacity: opacity, duration: dur)
+                }
             } else {
-                if w.alphaValue > 0.5 { anyDimmed = true }
-                if w.alphaValue < opacity - 0.01 {
+                if w.isVisible { anyDimmed = true }
+                // Only schedule a show if not already visible AND not already
+                // pending — otherwise we'd reset the leave-delay timer every
+                // frame and the deferred show would never fire.
+                if !w.isVisible && !w.hasPendingShow {
                     let delay = s.leaveDelay
                     w.scheduleShow(after: delay, opacity: opacity, duration: dur) { [weak self, weak w] in
                         guard let self = self, let w = w else { return false }

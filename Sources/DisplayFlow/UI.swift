@@ -19,6 +19,8 @@ final class MenuBarController: NSObject {
             .sink { [weak self] _ in self?.rebuild() }.store(in: &cancellables)
         Settings.shared.$manualRest.dropFirst()
             .sink { [weak self] _ in self?.rebuild() }.store(in: &cancellables)
+        Settings.shared.$language.dropFirst()
+            .sink { [weak self] _ in self?.rebuild() }.store(in: &cancellables)
         controller.$state.dropFirst()
             .sink { [weak self] _ in self?.rebuild() }.store(in: &cancellables)
     }
@@ -47,25 +49,25 @@ final class MenuBarController: NSObject {
 
         menu.addItem(.separator())
 
-        let toggle = NSMenuItem(title: s.enabled ? "Pause Display Flow" : "Resume Display Flow",
+        let toggle = NSMenuItem(title: s.enabled ? s.t(.menuPause) : s.t(.menuResume),
                                 action: #selector(toggleEnabled), keyEquivalent: "")
         toggle.target = self
         menu.addItem(toggle)
 
-        let rest = NSMenuItem(title: s.manualRest ? "Wake Displays" : "Rest Displays Now",
+        let rest = NSMenuItem(title: s.manualRest ? s.t(.wakeDisplays) : s.t(.restDisplaysNow),
                               action: #selector(toggleRest), keyEquivalent: "r")
         rest.target = self
         menu.addItem(rest)
 
         menu.addItem(.separator())
 
-        let prefsItem = NSMenuItem(title: "Preferences…",
+        let prefsItem = NSMenuItem(title: s.t(.menuPreferences),
                                    action: #selector(showPrefs), keyEquivalent: ",")
         prefsItem.target = self
         menu.addItem(prefsItem)
 
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Display Flow",
+        menu.addItem(NSMenuItem(title: s.t(.menuQuit),
                                 action: #selector(NSApp.terminate(_:)),
                                 keyEquivalent: "q"))
 
@@ -73,15 +75,17 @@ final class MenuBarController: NSObject {
     }
 
     private func statusText() -> String {
+        let s = Settings.shared
         switch controller.state {
-        case .disabled:                  return "Paused"
-        case .noDisplays:                return "No displays selected"
-        case .manualRest:                return "Resting displays"
-        case .scheduled:                 return "Resting on schedule"
-        case .mediaPaused:               return "Paused — media is playing"
-        case .idleBlackout:              return "Blackout — system idle"
+        case .disabled:                  return s.t(.statusPaused)
+        case .noDisplays:                return s.t(.statusNoDisplaysShort)
+        case .manualRest:                return s.t(.statusManualRest)
+        case .scheduled:                 return s.t(.statusScheduled)
+        case .mediaPaused:               return s.t(.statusMediaPaused)
+        case .idleBlackout:              return s.t(.statusIdleBlackout)
         case .active(let n):
-            return n == 1 ? "Protecting 1 display" : "Protecting \(n) displays"
+            if n == 1 { return s.t(.statusActiveOne) }
+            return String(format: s.t(.statusActiveMany), n)
         }
     }
 
@@ -141,10 +145,11 @@ struct PreferencesView: View {
             VStack(alignment: .leading, spacing: 22) {
                 header
                 statusCard
-                section("Displays") { displaysContent }
-                section("Appearance") { appearanceContent }
-                section("Care") { careContent }
-                section("Schedule") { scheduleContent }
+                section(settings.t(.sectionDisplays)) { displaysContent }
+                section(settings.t(.sectionAppearance)) { appearanceContent }
+                section(settings.t(.sectionCare)) { careContent }
+                section(settings.t(.sectionSchedule)) { scheduleContent }
+                section(settings.t(.sectionLanguage)) { languageContent }
                 footer
             }
             .padding(28)
@@ -186,7 +191,7 @@ struct PreferencesView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Display Flow")
                     .font(.system(size: 20, weight: .bold))
-                Text("Burn-in protection for your monitor")
+                Text(settings.t(.appSubtitle))
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
@@ -246,35 +251,36 @@ struct PreferencesView: View {
     private var statusVisuals: StatusVisuals {
         switch controller.state {
         case .disabled:
-            return .init(text: "Paused",
-                         subtitle: "Display Flow is off",
+            return .init(text: settings.t(.statusPaused),
+                         subtitle: settings.t(.subPaused),
                          symbol: "pause.circle.fill", color: .orange)
         case .noDisplays:
-            return .init(text: "No displays selected for protection",
-                         subtitle: "Toggle a display below to start",
+            return .init(text: settings.t(.statusIdle),
+                         subtitle: settings.t(.subNoDisplays),
                          symbol: "exclamationmark.triangle.fill", color: .yellow)
         case .manualRest:
-            return .init(text: "Resting displays",
-                         subtitle: "Click Wake Displays to resume",
+            return .init(text: settings.t(.statusManualRest),
+                         subtitle: settings.t(.subManualRest),
                          symbol: "moon.stars.fill", color: .indigo)
         case .scheduled:
-            return .init(text: "Resting on schedule",
-                         subtitle: "Auto-rest window is active",
+            return .init(text: settings.t(.statusScheduled),
+                         subtitle: settings.t(.subScheduled),
                          symbol: "clock.fill", color: .indigo)
         case .mediaPaused:
-            return .init(text: "Paused — media is playing",
-                         subtitle: "Will resume when playback stops",
+            return .init(text: settings.t(.statusMediaPaused),
+                         subtitle: settings.t(.subMediaPaused),
                          symbol: "play.rectangle.fill", color: .green)
         case .idleBlackout:
-            return .init(text: "Blackout — system is idle",
-                         subtitle: "Wakes on any input",
+            return .init(text: settings.t(.statusIdleBlackout),
+                         subtitle: settings.t(.subIdleBlackout),
                          symbol: "bed.double.fill", color: .indigo)
         case .active(let n):
-            let txt = n == 1 ? "Active — protecting 1 display"
-                             : "Active — protecting \(n) displays"
+            let txt = (n == 1)
+                ? settings.t(.statusActiveOne)
+                : String(format: settings.t(.statusActiveMany), n)
             return .init(text: txt,
-                         subtitle: "Move your cursor between screens",
-                         symbol: "checkmark.seal.fill", color: .green)
+                         subtitle: settings.t(.subActive),
+                         symbol: "checkmark.seal.fill", color: n == 0 ? .secondary : .green)
         }
     }
 
@@ -304,7 +310,7 @@ struct PreferencesView: View {
     private var displaysContent: some View {
         VStack(spacing: 0) {
             if settings.screens.isEmpty {
-                Text("No displays detected.")
+                Text(settings.t(.noDisplaysDetected))
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
@@ -324,9 +330,11 @@ struct PreferencesView: View {
     private var appearanceContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Style").frame(width: 100, alignment: .leading)
+                Text(settings.t(.style)).frame(width: 100, alignment: .leading)
                 Picker("", selection: $settings.style) {
-                    ForEach(DimStyle.allCases) { Text($0.label).tag($0) }
+                    Text(settings.t(.styleBlack)).tag(DimStyle.black)
+                    Text(settings.t(.styleWhite)).tag(DimStyle.white)
+                    Text(settings.t(.styleBlur)).tag(DimStyle.blur)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -335,15 +343,15 @@ struct PreferencesView: View {
             LivePreview()
                 .frame(height: 88)
 
-            LabeledSlider(label: "Opacity",
+            LabeledSlider(label: settings.t(.opacity),
                           value: $settings.opacity, range: 0.4...1.0,
                           format: { "\(Int($0 * 100))%" })
-            LabeledSlider(label: "Fade speed",
+            LabeledSlider(label: settings.t(.fadeSpeed),
                           value: $settings.fadeDuration, range: 0.0...1.5,
-                          format: { $0 < 0.05 ? "Instant" : String(format: "%.2fs", $0) })
-            LabeledSlider(label: "Leave delay",
+                          format: { $0 < 0.05 ? self.settings.t(.fadeInstant) : String(format: "%.2fs", $0) })
+            LabeledSlider(label: settings.t(.leaveDelay),
                           value: $settings.leaveDelay, range: 0...3,
-                          format: { $0 < 0.05 ? "None" : String(format: "%.1fs", $0) })
+                          format: { $0 < 0.05 ? self.settings.t(.leaveNone) : String(format: "%.1fs", $0) })
         }
     }
 
@@ -353,8 +361,8 @@ struct PreferencesView: View {
         VStack(alignment: .leading, spacing: 14) {
             Toggle(isOn: $settings.pauseOnMedia) {
                 careRow(symbol: "play.rectangle.fill",
-                        title: "Pause while a video is on screen",
-                        subtitle: "Full-screen, picture-in-picture, or in a tab — any visible video. Audio-only apps (music, voice calls) won't pause the dimming.")
+                        title: settings.t(.carePauseMediaTitle),
+                        subtitle: settings.t(.carePauseMediaSubtitle))
             }
             .toggleStyle(.switch)
 
@@ -362,8 +370,8 @@ struct PreferencesView: View {
 
             Toggle(isOn: $settings.pixelShift) {
                 careRow(symbol: "arrow.up.and.down.and.arrow.left.and.right",
-                        title: "Pixel shift",
-                        subtitle: "Subtly drifts the overlay ±1 pixel every minute so the menu-bar cover doesn't always sit on the same physical pixels.")
+                        title: settings.t(.carePixelShiftTitle),
+                        subtitle: settings.t(.carePixelShiftSubtitle))
             }
             .toggleStyle(.switch)
 
@@ -371,23 +379,23 @@ struct PreferencesView: View {
 
             Toggle(isOn: $settings.blackoutWhenIdle) {
                 careRow(symbol: "bed.double.fill",
-                        title: "Blackout protected displays when idle",
-                        subtitle: "After a period of no input, fully cover protected displays.")
+                        title: settings.t(.careBlackoutIdleTitle),
+                        subtitle: settings.t(.careBlackoutIdleSubtitle))
             }
             .toggleStyle(.switch)
 
             if settings.blackoutWhenIdle {
                 HStack {
-                    Text("Idle threshold")
+                    Text(settings.t(.idleThreshold))
                         .frame(width: 110, alignment: .leading)
                         .foregroundColor(.secondary)
                         .font(.system(size: 12))
                     Picker("", selection: $settings.idleSeconds) {
-                        Text("1 minute").tag(60.0)
-                        Text("2 minutes").tag(120.0)
-                        Text("5 minutes").tag(300.0)
-                        Text("10 minutes").tag(600.0)
-                        Text("30 minutes").tag(1800.0)
+                        Text(settings.t(.minute_1)).tag(60.0)
+                        Text(settings.t(.minutes_2)).tag(120.0)
+                        Text(settings.t(.minutes_5)).tag(300.0)
+                        Text(settings.t(.minutes_10)).tag(600.0)
+                        Text(settings.t(.minutes_30)).tag(1800.0)
                     }
                     .labelsHidden()
                     .frame(width: 160)
@@ -403,7 +411,7 @@ struct PreferencesView: View {
                 HStack(spacing: 8) {
                     Image(systemName: settings.manualRest ? "sun.max.fill" : "moon.stars.fill")
                         .font(.system(size: 14, weight: .semibold))
-                    Text(settings.manualRest ? "Wake Displays" : "Rest Displays Now")
+                    Text(settings.manualRest ? settings.t(.wakeDisplays) : settings.t(.restDisplaysNow))
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
@@ -421,18 +429,18 @@ struct PreferencesView: View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $settings.scheduleEnabled) {
                 careRow(symbol: "clock.fill",
-                        title: "Auto-rest on schedule",
-                        subtitle: "Force-rest protected displays during set hours.")
+                        title: settings.t(.scheduleTitle),
+                        subtitle: settings.t(.scheduleSubtitle))
             }
             .toggleStyle(.switch)
 
             if settings.scheduleEnabled {
                 HStack(spacing: 10) {
-                    Text("From").foregroundColor(.secondary).font(.system(size: 12))
+                    Text(settings.t(.scheduleFrom)).foregroundColor(.secondary).font(.system(size: 12))
                     DatePicker("", selection: $settings.scheduleStart,
                                displayedComponents: .hourAndMinute)
                         .labelsHidden()
-                    Text("to").foregroundColor(.secondary).font(.system(size: 12))
+                    Text(settings.t(.scheduleTo)).foregroundColor(.secondary).font(.system(size: 12))
                     DatePicker("", selection: $settings.scheduleEnd,
                                displayedComponents: .hourAndMinute)
                         .labelsHidden()
@@ -444,6 +452,27 @@ struct PreferencesView: View {
         }
     }
 
+    // MARK: Language
+
+    private var languageContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker(selection: $settings.language) {
+                ForEach(AppLanguage.allCases) { lang in
+                    HStack(spacing: 8) {
+                        Text(lang.flag)
+                        Text(lang.nativeName)
+                    }
+                    .tag(lang)
+                }
+            } label: {
+                EmptyView()
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(maxWidth: 240)
+        }
+    }
+
     // MARK: Footer
 
     private var footer: some View {
@@ -451,11 +480,12 @@ struct PreferencesView: View {
             Image(systemName: "shield.lefthalf.filled")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
-            Text("Total time protected: \(formatDuration(settings.totalProtectedSeconds))")
+            Text(String(format: settings.t(.totalProtected),
+                        formatDuration(settings.totalProtectedSeconds)))
                 .font(.caption)
                 .foregroundColor(.secondary)
             Spacer()
-            Text("v0.3").font(.caption).foregroundColor(.secondary.opacity(0.6))
+            Text("v0.4").font(.caption).foregroundColor(.secondary.opacity(0.6))
         }
         .padding(.top, 4)
     }
@@ -483,9 +513,9 @@ struct PreferencesView: View {
         let s = Int(seconds)
         let h = s / 3600
         let m = (s % 3600) / 60
-        if h > 0 { return "\(h)h \(m)m" }
-        if m > 0 { return "\(m)m" }
-        return "\(s)s"
+        if h > 0 { return String(format: settings.t(.unitHourMin), h, m) }
+        if m > 0 { return String(format: settings.t(.unitMin), m) }
+        return String(format: settings.t(.unitSec), s)
     }
 }
 
@@ -515,7 +545,7 @@ private struct DisplayRow: View {
                 HStack(spacing: 6) {
                     Text(screen.name).font(.system(size: 13, weight: .semibold))
                     if !screen.isBuiltin {
-                        Text("EXTERNAL")
+                        Text(settings.t(.badgeExternal))
                             .font(.system(size: 9, weight: .bold))
                             .tracking(0.6)
                             .padding(.horizontal, 5).padding(.vertical, 1.5)
@@ -525,8 +555,8 @@ private struct DisplayRow: View {
                             .foregroundColor(.blue)
                     }
                 }
-                Text("\(Int(screen.frame.width))×\(Int(screen.frame.height))" +
-                     (settings.isProtected(screen.id) ? " · Protected" : " · Not protected"))
+                Text("\(Int(screen.frame.width))×\(Int(screen.frame.height)) · " +
+                     (settings.isProtected(screen.id) ? settings.t(.displayProtected) : settings.t(.displayNotProtected)))
                     .font(.system(size: 11)).foregroundColor(.secondary)
             }
             Spacer()
@@ -555,7 +585,6 @@ private struct LivePreview: View {
 
     var body: some View {
         ZStack {
-            // Mock content underneath
             LinearGradient(colors: [
                 Color(red: 0.95, green: 0.35, blue: 0.55),
                 Color(red: 0.30, green: 0.45, blue: 0.95),
@@ -564,12 +593,11 @@ private struct LivePreview: View {
 
             HStack(spacing: 6) {
                 Image(systemName: "macwindow")
-                Text("Your screen")
+                Text(settings.t(.previewLabel))
             }
             .font(.system(size: 11, weight: .medium))
             .foregroundColor(.white.opacity(0.85))
 
-            // The dim overlay preview
             Group {
                 switch settings.style {
                 case .black:

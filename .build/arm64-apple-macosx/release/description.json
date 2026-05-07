@@ -24,6 +24,10 @@
       "inputs" : [
         {
           "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/Localization.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift"
         },
         {
@@ -55,6 +59,7 @@
       "moduleName" : "DisplayFlow",
       "moduleOutputPath" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/Modules/DisplayFlow.swiftmodule",
       "objects" : [
+        "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Localization.swift.o",
         "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.swift.o",
         "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.swift.o",
         "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.swift.o",
@@ -105,6 +110,10 @@
       "outputs" : [
         {
           "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Localization.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.swift.o"
         },
         {
@@ -130,6 +139,7 @@
       ],
       "prepareForIndexing" : false,
       "sources" : [
+        "/Users/vitio/display flow + care/Sources/DisplayFlow/Localization.swift",
         "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift",
         "/Users/vitio/display flow + care/Sources/DisplayFlow/Overlay.swift",
         "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift",
@@ -151,6 +161,7 @@
       "-package-name",
       "display_flow___care",
       "-c",
+      "/Users/vitio/display flow + care/Sources/DisplayFlow/Localization.swift",
       "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift",
       "/Users/vitio/display flow + care/Sources/DisplayFlow/Overlay.swift",
       "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift",
@@ -226,6 +237,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/Localization.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift"
         },
         {
@@ -253,6 +268,10 @@
         {
           "kind" : "virtual",
           "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Localization.swift.o"
         },
         {
           "kind" : "file",

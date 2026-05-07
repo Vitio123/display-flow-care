@@ -247,14 +247,21 @@ final class OverlayController: ObservableObject {
     private var lastShiftAt: Date = .distantPast
     private let shiftIntervalSeconds: TimeInterval = 60
 
-    // Mission-Control / space-switch detection. The cursor "warps" between
-    // displays during these animations and would otherwise yank the overlay
-    // off and on again — annoying for someone who hits Ctrl+Up all the time.
-    // While frozen, the cursor-follow loop is skipped and overlays hold
-    // whatever state they were in.
+    // Mission-Control / space-switch handling. Several signals are combined:
+    //   - `activeSpaceDidChangeNotification` for real space switches
+    //   - cursor warp (large jump in one tick) for system cursor teleports
+    //   - `NSWindow.didChangeOcclusionStateNotification` — when our overlay
+    //     gets covered by a system UI like Mission Control
+    // When any fires we run a "graceful pulse": fade overlays out smoothly,
+    // hold while MC is up, fade back in smoothly. The cursor-follow loop is
+    // also frozen during the pulse so it can't fight the animation.
     private var lastCursorPos: NSPoint = NSEvent.mouseLocation
     private var freezeUntil: Date = .distantPast
+    private var pulseRestoreItem: DispatchWorkItem?
     private var spaceObserver: NSObjectProtocol?
+    private var occlusionObserver: NSObjectProtocol?
+    private let pulseFadeSeconds: Double = 0.5
+    private let pulseHoldSeconds: Double = 1.0
 
     init() {
         mediaWatcher.start()
@@ -269,13 +276,30 @@ final class OverlayController: ObservableObject {
         ) { [weak self] _ in self?.rebuild() }
 
         // Real space switches (Ctrl+Left/Right, swipe, click in Mission
-        // Control) come through here — pause the cursor-follow loop briefly
-        // so the overlay doesn't flash.
+        // Control) come through here — run the graceful pulse so the
+        // overlay fades smoothly instead of snapping.
         spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            self?.freezeUntil = Date().addingTimeInterval(1.5)
+            self?.beginGracefulPulse()
+        }
+
+        // When Mission Control draws its grid above us our overlay's
+        // occlusion state flips to "not visible" — that's the cleanest
+        // signal we get for "MC just opened". Fires also when MC closes
+        // and our window becomes visible again.
+        occlusionObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification,
+            object: nil, queue: .main
+        ) { [weak self] notif in
+            guard let window = notif.object as? NSWindow,
+                  let self = self,
+                  self.overlays.contains(where: { $0.window == window })
+            else { return }
+            if !window.occlusionState.contains(.visible) {
+                self.beginGracefulPulse()
+            }
         }
 
         // Rebuild overlays on style change (NSVisualEffectView vs solid).
@@ -328,6 +352,41 @@ final class OverlayController: ObservableObject {
         applyShift(shiftPattern[shiftIndex])
     }
 
+    /// Start a graceful pulse: fade overlays out, hold ~1s while Mission
+    /// Control / space animation is happening, then fade back in. Bypasses
+    /// the cursor-follow loop so it can't fight the animation.
+    private func beginGracefulPulse() {
+        let totalSeconds = pulseFadeSeconds + pulseHoldSeconds + pulseFadeSeconds
+        let now = Date()
+        // Don't restart a pulse that's already running unless it's almost done.
+        if now < freezeUntil.addingTimeInterval(-pulseFadeSeconds) { return }
+        freezeUntil = now.addingTimeInterval(totalSeconds)
+
+        // Fade currently-visible overlays out smoothly.
+        let opacity = CGFloat(settings.opacity)
+        for w in overlays where w.isVisible || w.hasPendingShow {
+            w.setVisible(false, opacity: opacity, duration: pulseFadeSeconds)
+        }
+        for bar in topBars {
+            bar.setVisible(false, duration: pulseFadeSeconds)
+        }
+
+        // After the hold, restore based on current cursor / state. Cancel any
+        // previous restore item so back-to-back triggers don't fight.
+        pulseRestoreItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            self.pulseRestoreItem = nil
+            // tick() will pick up where it left off — just nudge the freeze
+            // out so cursor-follow can run again on the next tick.
+            self.freezeUntil = .distantPast
+        }
+        pulseRestoreItem = work
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + pulseFadeSeconds + pulseHoldSeconds,
+            execute: work)
+    }
+
     /// Apply a pixel offset to all overlay and top-bar windows.
     private func applyShift(_ offset: CGSize) {
         overlays.forEach { $0.applyOffset(offset) }
@@ -354,12 +413,17 @@ final class OverlayController: ObservableObject {
         return m.y > frame.maxY - max(50, bar.height * 1.5)
     }
 
-    private func showTopBars() {
+    private func showTopBars(forceHidden: Set<CGDirectDisplayID> = []) {
         guard !topBars.isEmpty else { return }
         let cursorID = cursorDisplayID()
         for bar in topBars {
+            if forceHidden.contains(bar.displayID) {
+                // Video is playing on this display — let the user see the
+                // menu bar so they can interact normally.
+                bar.setVisible(false, duration: 0.25)
+                continue
+            }
             let revealing = (bar.displayID == cursorID) && isCursorInTopStrip(displayID: bar.displayID)
-            // Reveal fast (so menus feel snappy), hide a touch slower.
             bar.setVisible(!revealing, duration: revealing ? 0.10 : 0.25)
         }
     }
@@ -429,14 +493,6 @@ final class OverlayController: ObservableObject {
             updateState(.scheduled)
             return
         }
-        if s.pauseOnMedia && mediaWatcher.mediaPlaying {
-            hideAll(duration: dur)
-            // While media is playing the user probably wants the menu bar
-            // visible too (clock, sound, etc.), so the cover steps out.
-            hideTopBars()
-            updateState(.mediaPaused)
-            return
-        }
         if s.blackoutWhenIdle && mediaWatcher.idleSeconds > s.idleSeconds {
             showAll(opacity: opacity, duration: dur)
             showTopBars()
@@ -445,57 +501,76 @@ final class OverlayController: ObservableObject {
             return
         }
 
-        // Cursor warp detection. Anything moving > 1500px in a single 33ms
-        // tick is almost certainly a system warp (Mission Control, app
-        // switcher) — real mouse motion peaks around 5–8 k px/s. Freeze the
-        // cursor-follow loop for 1.5s so the overlay doesn't dim-then-undim.
+        // Cursor warp detection — system cursor teleports during Mission
+        // Control / app switcher / etc.
         let now = Date()
         let m = NSEvent.mouseLocation
         let dx = m.x - lastCursorPos.x
         let dy = m.y - lastCursorPos.y
-        if (dx * dx + dy * dy).squareRoot() > 1500 {
-            freezeUntil = now.addingTimeInterval(1.5)
+        if (dx * dx + dy * dy).squareRoot() > 600 {
+            beginGracefulPulse()
         }
         lastCursorPos = m
 
+        // Frozen: pulse animation is running (fade-out → hold → fade-in).
         if now < freezeUntil {
-            // Hold current state. Stats keep ticking if anything was already
-            // visible, top bars keep doing their own cursor-aware thing.
             if overlays.contains(where: { $0.isVisible }) {
                 accrueProtectedTime()
             }
-            showTopBars()
             updateState(.active(protectedCount: protectedCount))
             return
         }
 
-        // Cursor follow
+        // Per-display media + cursor follow.
         let cursorID = cursorDisplayID()
+        let mediaDisplays = s.pauseOnMedia ? mediaWatcher.displaysWithMedia : []
         var anyDimmed = false
+        var mediaOnAnyProtected = false
+        var mediaPausedDisplays = Set<CGDirectDisplayID>()
+
         for w in overlays {
+            let mediaHere = mediaDisplays.contains(w.displayID)
+            if mediaHere {
+                mediaOnAnyProtected = true
+                mediaPausedDisplays.insert(w.displayID)
+                // Hide because video is on THIS display.
+                if w.isVisible || w.hasPendingShow {
+                    w.setVisible(false, opacity: opacity, duration: dur)
+                }
+                continue
+            }
+
             if w.displayID == cursorID {
-                // Cursor is here — make sure overlay is hidden and any pending
-                // show is canceled. Only act on transitions.
                 if w.isVisible || w.hasPendingShow {
                     w.setVisible(false, opacity: opacity, duration: dur)
                 }
             } else {
                 if w.isVisible { anyDimmed = true }
-                // Only schedule a show if not already visible AND not already
-                // pending — otherwise we'd reset the leave-delay timer every
-                // frame and the deferred show would never fire.
                 if !w.isVisible && !w.hasPendingShow {
                     let delay = s.leaveDelay
                     w.scheduleShow(after: delay, opacity: opacity, duration: dur) { [weak self, weak w] in
                         guard let self = self, let w = w else { return false }
+                        if self.settings.pauseOnMedia &&
+                           self.mediaWatcher.displaysWithMedia.contains(w.displayID) {
+                            return false
+                        }
                         return self.cursorDisplayID() != w.displayID
                     }
                 }
             }
         }
-        showTopBars()
+        // Top bars: hide on displays where video is playing, normal cursor
+        // logic everywhere else.
+        showTopBars(forceHidden: mediaPausedDisplays)
         if anyDimmed { accrueProtectedTime() }
-        updateState(.active(protectedCount: protectedCount))
+
+        // Status only goes "media paused" if video is on a *protected* display.
+        // Video on the laptop (unprotected) leaves us in `.active`.
+        if mediaOnAnyProtected && mediaPausedDisplays.count == overlays.count {
+            updateState(.mediaPaused)
+        } else {
+            updateState(.active(protectedCount: protectedCount))
+        }
     }
 
     private func accrueProtectedTime() {

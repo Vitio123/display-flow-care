@@ -4,6 +4,12 @@
     "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/DisplayFlow.o",
     "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/primary.swiftdeps"
   },
+  "/Users/vitio/display flow + care/Sources/DisplayFlow/Localization.swift": {
+    "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Localization.swift.o",
+    "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Localization~partial.swiftmodule",
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Localization.swiftdeps",
+    "diagnostics": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Localization.dia"
+  },
   "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift": {
     "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.swift.o",
     "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher~partial.swiftmodule",

@@ -55,6 +55,7 @@ final class Settings: ObservableObject {
     @Published var pauseOnMedia: Bool     { didSet { d.set(pauseOnMedia, forKey: "pauseOnMedia") } }
     @Published var hideTopBar: Bool       { didSet { d.set(hideTopBar, forKey: "hideTopBar") } }
     @Published var pixelShift: Bool       { didSet { d.set(pixelShift, forKey: "pixelShift") } }
+    @Published var language: AppLanguage  { didSet { d.set(language.rawValue, forKey: "language") } }
     @Published var pauseOnFullscreen: Bool { didSet { d.set(pauseOnFullscreen, forKey: "pauseOnFullscreen") } }
     @Published var blackoutWhenIdle: Bool { didSet { d.set(blackoutWhenIdle, forKey: "blackoutWhenIdle") } }
     @Published var idleSeconds: Double    { didSet { d.set(idleSeconds, forKey: "idleSeconds") } }
@@ -78,6 +79,11 @@ final class Settings: ObservableObject {
         self.pauseOnMedia       = d.object(forKey: "pauseOnMedia")       as? Bool   ?? true
         self.hideTopBar         = d.object(forKey: "hideTopBar")         as? Bool   ?? true
         self.pixelShift         = d.object(forKey: "pixelShift")         as? Bool   ?? true
+        if let saved = d.string(forKey: "language"), let lang = AppLanguage(rawValue: saved) {
+            self.language = lang
+        } else {
+            self.language = AppLanguage.systemDefault
+        }
         self.pauseOnFullscreen  = d.object(forKey: "pauseOnFullscreen")  as? Bool   ?? true
         self.blackoutWhenIdle   = d.object(forKey: "blackoutWhenIdle")   as? Bool   ?? false
         self.idleSeconds        = d.object(forKey: "idleSeconds")        as? Double ?? 300
@@ -112,6 +118,11 @@ final class Settings: ObservableObject {
         d.set(flag, forKey: "protect_\(id)")
         objectWillChange.send()
         NotificationCenter.default.post(name: .protectionChanged, object: nil)
+    }
+
+    /// Localized string for the current language, with optional printf args.
+    func t(_ key: LocKey) -> String {
+        return translate(key, language: language)
     }
 
     /// Returns true if "now" falls inside the configured schedule window

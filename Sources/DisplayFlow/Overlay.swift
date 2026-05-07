@@ -493,7 +493,14 @@ final class OverlayController: ObservableObject {
             updateState(.scheduled)
             return
         }
-        if s.blackoutWhenIdle && mediaWatcher.idleSeconds > s.idleSeconds {
+        // Idle blackout — but only if nothing is playing. HIDIdleTime measures
+        // seconds since the last keyboard/mouse input, so watching a video for
+        // 5 minutes without touching anything would otherwise trigger a
+        // blackout even though the user is actively watching. If any display
+        // has video, the user is engaged and we skip the blackout.
+        if s.blackoutWhenIdle
+            && mediaWatcher.idleSeconds > s.idleSeconds
+            && !mediaWatcher.mediaPlaying {
             showAll(opacity: opacity, duration: dur)
             showTopBars()
             accrueProtectedTime()

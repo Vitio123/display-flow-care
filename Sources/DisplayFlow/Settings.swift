@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import CoreGraphics
+import ServiceManagement
 
 // MARK: - Public types
 
@@ -55,6 +56,8 @@ final class Settings: ObservableObject {
     @Published var pauseOnMedia: Bool     { didSet { d.set(pauseOnMedia, forKey: "pauseOnMedia") } }
     @Published var hideTopBar: Bool       { didSet { d.set(hideTopBar, forKey: "hideTopBar") } }
     @Published var pixelShift: Bool       { didSet { d.set(pixelShift, forKey: "pixelShift") } }
+    @Published var batterySaverMode: Bool { didSet { d.set(batterySaverMode, forKey: "batterySaverMode") } }
+    @Published var autoBatterySaverWhenLow: Bool { didSet { d.set(autoBatterySaverWhenLow, forKey: "autoBatterySaverWhenLow") } }
     @Published var language: AppLanguage  { didSet { d.set(language.rawValue, forKey: "language") } }
     @Published var pauseOnFullscreen: Bool { didSet { d.set(pauseOnFullscreen, forKey: "pauseOnFullscreen") } }
     @Published var blackoutWhenIdle: Bool { didSet { d.set(blackoutWhenIdle, forKey: "blackoutWhenIdle") } }
@@ -79,6 +82,8 @@ final class Settings: ObservableObject {
         self.pauseOnMedia       = d.object(forKey: "pauseOnMedia")       as? Bool   ?? true
         self.hideTopBar         = d.object(forKey: "hideTopBar")         as? Bool   ?? true
         self.pixelShift         = d.object(forKey: "pixelShift")         as? Bool   ?? true
+        self.batterySaverMode   = d.object(forKey: "batterySaverMode")   as? Bool   ?? false
+        self.autoBatterySaverWhenLow = d.object(forKey: "autoBatterySaverWhenLow") as? Bool ?? false
         if let saved = d.string(forKey: "language"), let lang = AppLanguage(rawValue: saved) {
             self.language = lang
         } else {
@@ -138,5 +143,38 @@ final class Settings: ObservableObject {
         if sm == em { return false }
         if sm < em  { return nm >= sm && nm < em }
         return nm >= sm || nm < em        // overnight
+    }
+
+    // MARK: - Launch at login (SMAppService)
+
+    /// Live read of the system's login-item registration. macOS may flip this
+    /// outside our app via System Settings → General → Login Items, so we
+    /// always poll instead of caching.
+    var launchAtLoginEnabled: Bool {
+        SMAppService.mainApp.status == .enabled
+    }
+
+    /// Register/unregister the main app as a login item. macOS shows the
+    /// user a notification ("'Display Flow' added to Login Items") and
+    /// they can manage it from System Settings. If the user has previously
+    /// denied it, `register()` throws `.notAuthorized` — we surface it.
+    @discardableResult
+    func setLaunchAtLogin(_ enabled: Bool) -> Error? {
+        let svc = SMAppService.mainApp
+        do {
+            switch (enabled, svc.status) {
+            case (true, .enabled), (false, .notRegistered), (false, .notFound):
+                break  // already in desired state
+            case (true, _):
+                try svc.register()
+            case (false, _):
+                try svc.unregister()
+            }
+            objectWillChange.send()
+            return nil
+        } catch {
+            objectWillChange.send()
+            return error
+        }
     }
 }

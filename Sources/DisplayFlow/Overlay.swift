@@ -1,6 +1,38 @@
 import AppKit
 import Combine
 
+// MARK: - Private CGS API: pin a window to every Space, including full-screen
+//
+// `NSWindow.collectionBehavior` (`.canJoinAllSpaces`,
+// `.canJoinAllApplications`) is supposed to handle this case but on macOS
+// 13–15 it doesn't reliably attach to full-screen Spaces created by *other*
+// applications. The private CGSAddWindowsToSpaces call is the well-known
+// workaround — same one used by Bartender, MeetingBar, etc. — and is stable
+// across recent macOS versions. We only use it for app-internal layout, no
+// App Store concern.
+
+@_silgen_name("CGSMainConnectionID")
+fileprivate func CGSMainConnectionID() -> Int32
+
+@_silgen_name("CGSCopySpaces")
+fileprivate func CGSCopySpaces(_ cid: Int32, _ mask: Int) -> Unmanaged<CFArray>?
+
+@_silgen_name("CGSAddWindowsToSpaces")
+fileprivate func CGSAddWindowsToSpaces(_ cid: Int32, _ wids: CFArray, _ sids: CFArray)
+
+/// Mask 7 = current + others + user — covers every Space type including the
+/// dedicated full-screen ones. (Bits: 1=current, 2=others, 4=user.)
+fileprivate let CGSAllSpacesMask = 7
+
+fileprivate func pinWindowToAllSpaces(_ window: NSWindow) {
+    guard window.windowNumber > 0 else { return }
+    let cid = CGSMainConnectionID()
+    guard let spacesRef = CGSCopySpaces(cid, CGSAllSpacesMask) else { return }
+    let spaces = spacesRef.takeRetainedValue()
+    let wids = [CGWindowID(window.windowNumber)] as CFArray
+    CGSAddWindowsToSpaces(cid, wids, spaces)
+}
+
 // MARK: - One overlay per protected screen
 
 final class OverlayWindow {
@@ -48,10 +80,13 @@ final class OverlayWindow {
         w.hasShadow = false
         w.ignoresMouseEvents = true
         w.level = .screenSaver
-        w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        w.collectionBehavior = [.canJoinAllSpaces, .canJoinAllApplications, .stationary, .ignoresCycle]
         w.contentView = view
         w.alphaValue = 0
         w.orderFrontRegardless()
+        // Force the window into every existing Space — public collection
+        // behavior alone misses other apps' full-screen Spaces.
+        pinWindowToAllSpaces(w)
         self.window = w
     }
 
@@ -70,7 +105,15 @@ final class OverlayWindow {
 
     func setVisible(_ visible: Bool, opacity: CGFloat, duration: Double) {
         pendingShow?.cancel(); pendingShow = nil
+        let wasVisible = isVisible
         isVisible = visible
+        // Becoming visible: re-attach to whatever Space is currently shown
+        // on this display. Required for full-screen Spaces — even with
+        // `.canJoinAllApplications`, the system sometimes leaves the window
+        // bound to the previous Space until we kick it.
+        if visible && !wasVisible {
+            window.orderFrontRegardless()
+        }
         let target: CGFloat = visible ? opacity : 0
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = duration
@@ -126,6 +169,9 @@ final class TopBarWindow {
     /// Inflated frame so a small pixel-shift offset never exposes the menu
     /// bar at the edges.
     let baseFrame: NSRect
+    /// Track desired visibility so tick() can skip redundant animation
+    /// requests instead of re-running NSAnimationContext every frame.
+    private(set) var isVisible: Bool = false
 
     init(screen: NSScreen, style: DimStyle) {
         let key = NSDeviceDescriptionKey("NSScreenNumber")
@@ -170,10 +216,11 @@ final class TopBarWindow {
         w.hasShadow = false
         w.ignoresMouseEvents = true
         w.level = .screenSaver
-        w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        w.collectionBehavior = [.canJoinAllSpaces, .canJoinAllApplications, .stationary, .ignoresCycle]
         w.contentView = view
         w.alphaValue = 0
         w.orderFrontRegardless()
+        pinWindowToAllSpaces(w)
         self.window = w
     }
 
@@ -189,6 +236,9 @@ final class TopBarWindow {
     }
 
     func setVisible(_ visible: Bool, opacity: CGFloat = 1.0, duration: Double) {
+        // Idempotent — same desired state, don't kick off another animation.
+        if visible == isVisible { return }
+        isVisible = visible
         let target: CGFloat = visible ? opacity : 0
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = duration
@@ -202,6 +252,7 @@ final class TopBarWindow {
 
 enum OverlayState: Equatable {
     case disabled                   // master switch off
+    case hibernating                // battery saver / no external — fully paused
     case noDisplays                 // no protected displays selected
     case manualRest                 // user pressed Rest Now
     case scheduled                  // schedule window active
@@ -210,10 +261,18 @@ enum OverlayState: Equatable {
     case active(protectedCount: Int)
 }
 
+/// Why the controller is currently hibernating, so the UI can explain itself.
+enum HibernationReason: String {
+    case noExternalDisplay
+    case manualBatterySaver
+    case lowBattery
+}
+
 // MARK: - Controller
 
 final class OverlayController: ObservableObject {
     let mediaWatcher = MediaWatcher()
+    let powerWatcher = PowerWatcher()
 
     private var overlays: [OverlayWindow] = []
     private var topBars: [TopBarWindow] = []
@@ -226,9 +285,24 @@ final class OverlayController: ObservableObject {
     @Published private(set) var protectedCount: Int = 0
     @Published private(set) var state: OverlayState = .active(protectedCount: 0)
 
-    /// Battery for stats: only commit to UserDefaults every ~5s to avoid churn.
+    /// True while we've stopped all polling and torn down windows because
+    /// there's no external display to protect — nothing useful to do, may as
+    /// well consume zero. Battery-saver toggles drive `lowPower` instead so
+    /// the app keeps working, just lighter.
+    @Published private(set) var hibernating: Bool = false
+    @Published private(set) var hibernationReason: HibernationReason = .noExternalDisplay
+
+    /// Lightweight mode: tick + polls run at a slower cadence and pixel-shift
+    /// is paused, but cursor follow and media detection still work. Driven by
+    /// the Battery saver toggle and (optionally) the auto-pause-when-low rule.
+    @Published private(set) var lowPower: Bool = false
+
+    /// Stat accrual: only commit to UserDefaults every ~5s to avoid churn,
+    /// and use real elapsed time so the count is correct regardless of the
+    /// timer's tick rate.
     private var unsavedSeconds: Double = 0
     private var lastSaved: Date = .distantPast
+    private var lastAccrualAt: Date = Date()
 
     // Pixel-shift cycle. Walks a 3×3 neighborhood around (0,0) so the overlay
     // boundary lands on slightly different physical pixels each minute.
@@ -247,25 +321,29 @@ final class OverlayController: ObservableObject {
     private var lastShiftAt: Date = .distantPast
     private let shiftIntervalSeconds: TimeInterval = 60
 
-    // Mission-Control / space-switch handling. Several signals are combined:
-    //   - `activeSpaceDidChangeNotification` for real space switches
-    //   - cursor warp (large jump in one tick) for system cursor teleports
-    //   - `NSWindow.didChangeOcclusionStateNotification` — when our overlay
-    //     gets covered by a system UI like Mission Control
-    // When any fires we run a "graceful pulse": fade overlays out smoothly,
-    // hold while MC is up, fade back in smoothly. The cursor-follow loop is
-    // also frozen during the pulse so it can't fight the animation.
-    private var lastCursorPos: NSPoint = NSEvent.mouseLocation
-    private var freezeUntil: Date = .distantPast
-    private var pulseRestoreItem: DispatchWorkItem?
+    // Wake-from-sleep handler. Timers can be paused during system sleep, and
+    // various subsystems (CGWindowList, IOPM) need a kick to refresh.
+    private var wakeObserver: NSObjectProtocol?
+
+    // Active-space-change observer. Fires when the user switches Spaces or
+    // enters/leaves a full-screen app. Even with `.canJoinAllSpaces +
+    // .fullScreenAuxiliary` collection behavior, the first transition into a
+    // full-screen Space sometimes drops our overlay; re-asserting it with
+    // `orderFrontRegardless` forces it back on top.
     private var spaceObserver: NSObjectProtocol?
-    private var occlusionObserver: NSObjectProtocol?
-    private let pulseFadeSeconds: Double = 0.5
-    private let pulseHoldSeconds: Double = 1.0
 
     init() {
-        mediaWatcher.start()
-        rebuild()
+        powerWatcher.start()
+        // Decide hibernation up front so we don't spin up everything just to
+        // tear it down on the first tick.
+        if computeShouldHibernate() {
+            hibernating = true
+            hibernationReason = computeHibernationReason()
+            updateState(.hibernating)
+        } else {
+            mediaWatcher.start()
+            rebuild()
+        }
 
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -275,31 +353,24 @@ final class OverlayController: ObservableObject {
             forName: .protectionChanged, object: nil, queue: .main
         ) { [weak self] _ in self?.rebuild() }
 
-        // Real space switches (Ctrl+Left/Right, swipe, click in Mission
-        // Control) come through here — run the graceful pulse so the
-        // overlay fades smoothly instead of snapping.
+        // Wake-from-sleep: kick the timers and force a state refresh.
+        // System sleep pauses our timer and the occlusion / power info, so
+        // without this the app ends up "stuck" until the user clicks around.
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.handleWake()
+        }
+
+        // Re-assert window order when the active Space changes — covers
+        // entering / leaving full-screen apps so the overlay still draws
+        // over them on the OLED.
         spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            self?.beginGracefulPulse()
-        }
-
-        // When Mission Control draws its grid above us our overlay's
-        // occlusion state flips to "not visible" — that's the cleanest
-        // signal we get for "MC just opened". Fires also when MC closes
-        // and our window becomes visible again.
-        occlusionObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didChangeOcclusionStateNotification,
-            object: nil, queue: .main
-        ) { [weak self] notif in
-            guard let window = notif.object as? NSWindow,
-                  let self = self,
-                  self.overlays.contains(where: { $0.window == window })
-            else { return }
-            if !window.occlusionState.contains(.visible) {
-                self.beginGracefulPulse()
-            }
+            self?.reorderOverlays()
         }
 
         // Rebuild overlays on style change (NSVisualEffectView vs solid).
@@ -329,7 +400,39 @@ final class OverlayController: ObservableObject {
             }
             .store(in: &cancellables)
 
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
+        // Re-evaluate hibernation when battery / display / settings shift.
+        Publishers.CombineLatest3(
+            powerWatcher.$batteryPercent,
+            powerWatcher.$isOnBattery,
+            powerWatcher.$hasExternalDisplay
+        )
+        .dropFirst()
+        .sink { [weak self] _, _, _ in self?.evaluateHibernation() }
+        .store(in: &cancellables)
+
+        settings.$batterySaverMode
+            .dropFirst()
+            .sink { [weak self] _ in self?.evaluateHibernation() }
+            .store(in: &cancellables)
+
+        settings.$autoBatterySaverWhenLow
+            .dropFirst()
+            .sink { [weak self] _ in self?.evaluateHibernation() }
+            .store(in: &cancellables)
+
+        if !hibernating {
+            evaluateLowPower()  // applies poll intervals if user already has it on
+            startTickTimer()
+        }
+    }
+
+    private func startTickTimer() {
+        timer?.invalidate()
+        // Normal: 15 Hz (~67ms cursor-crossing latency, imperceptible).
+        // Low-power: 5 Hz (~200ms latency, still fine for cursor follow).
+        // Animations are GPU-driven by CoreAnimation either way.
+        let rate = lowPower ? 1.0/5.0 : 1.0/15.0
+        timer = Timer.scheduledTimer(withTimeInterval: rate, repeats: true) { [weak self] _ in
             self?.tick()
         }
     }
@@ -337,6 +440,14 @@ final class OverlayController: ObservableObject {
     func rebuild() {
         overlays.forEach { $0.close() }
         topBars.forEach { $0.close() }
+        overlays.removeAll()
+        topBars.removeAll()
+
+        // While hibernating we don't recreate any windows.
+        if hibernating {
+            protectedCount = 0
+            return
+        }
 
         let protectedScreens: [NSScreen] = NSScreen.screens.filter { screen in
             let key = NSDeviceDescriptionKey("NSScreenNumber")
@@ -352,39 +463,95 @@ final class OverlayController: ObservableObject {
         applyShift(shiftPattern[shiftIndex])
     }
 
-    /// Start a graceful pulse: fade overlays out, hold ~1s while Mission
-    /// Control / space animation is happening, then fade back in. Bypasses
-    /// the cursor-follow loop so it can't fight the animation.
-    private func beginGracefulPulse() {
-        let totalSeconds = pulseFadeSeconds + pulseHoldSeconds + pulseFadeSeconds
-        let now = Date()
-        // Don't restart a pulse that's already running unless it's almost done.
-        if now < freezeUntil.addingTimeInterval(-pulseFadeSeconds) { return }
-        freezeUntil = now.addingTimeInterval(totalSeconds)
+    // MARK: - Hibernation & low-power mode
 
-        // Fade currently-visible overlays out smoothly.
-        let opacity = CGFloat(settings.opacity)
-        for w in overlays where w.isVisible || w.hasPendingShow {
-            w.setVisible(false, opacity: opacity, duration: pulseFadeSeconds)
-        }
-        for bar in topBars {
-            bar.setVisible(false, duration: pulseFadeSeconds)
-        }
+    /// Hibernation = full pause. Reserved for "no external display" — there's
+    /// literally nothing to protect, so we close everything and stop polling.
+    private func computeShouldHibernate() -> Bool {
+        return !powerWatcher.hasExternalDisplay
+    }
 
-        // After the hold, restore based on current cursor / state. Cancel any
-        // previous restore item so back-to-back triggers don't fight.
-        pulseRestoreItem?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-            self.pulseRestoreItem = nil
-            // tick() will pick up where it left off — just nudge the freeze
-            // out so cursor-follow can run again on the next tick.
-            self.freezeUntil = .distantPast
+    private func computeHibernationReason() -> HibernationReason {
+        return .noExternalDisplay
+    }
+
+    /// Low-power = lighter cadence, but everything still works.
+    private func computeShouldLowPower() -> Bool {
+        if settings.batterySaverMode { return true }
+        if settings.autoBatterySaverWhenLow
+            && powerWatcher.isOnBattery
+            && powerWatcher.batteryPercent < 50 { return true }
+        return false
+    }
+
+    private func evaluateHibernation() {
+        let should = computeShouldHibernate()
+        if should && !hibernating { enterHibernation() }
+        else if !should && hibernating { exitHibernation() }
+        // Re-evaluate low-power even when hibernation didn't change.
+        evaluateLowPower()
+    }
+
+    private func evaluateLowPower() {
+        let want = !hibernating && computeShouldLowPower()
+        if want != lowPower {
+            lowPower = want
+            mediaWatcher.setPollInterval(want ? 4.0 : 2.0)
+            powerWatcher.setPollInterval(want ? 60.0 : 30.0)
+            startTickTimer()
         }
-        pulseRestoreItem = work
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + pulseFadeSeconds + pulseHoldSeconds,
-            execute: work)
+    }
+
+    private func enterHibernation() {
+        hibernating = true
+        hibernationReason = computeHibernationReason()
+        timer?.invalidate(); timer = nil
+        mediaWatcher.stop()
+        overlays.forEach { $0.cancelPending(); $0.close() }
+        topBars.forEach { $0.close() }
+        overlays.removeAll()
+        topBars.removeAll()
+        protectedCount = 0
+        updateState(.hibernating)
+    }
+
+    private func exitHibernation() {
+        hibernating = false
+        rebuild()
+        mediaWatcher.start()
+        startTickTimer()
+    }
+
+    /// macOS wakes from sleep. Timers may have stalled and our windows could
+    /// be in a weird state — refresh everything proactively.
+    private func handleWake() {
+        powerWatcher.pollNow()
+        if hibernating {
+            evaluateHibernation()
+            return
+        }
+        // Make sure the per-display windows still match the current screen
+        // setup (display reconnection during sleep is a thing) and restart
+        // the polls — they're cheap and resilient to redundant calls.
+        rebuild()
+        mediaWatcher.start()
+        startTickTimer()
+        reorderOverlays()
+    }
+
+    /// Re-pin all overlay + top-bar windows to every Space. Called whenever
+    /// the Space layout might have changed — entering / leaving full-screen,
+    /// adding a Desktop, waking from sleep — so a brand-new Space (e.g. the
+    /// one a freshly-fullscreened app just created) gets our windows too.
+    private func reorderOverlays() {
+        for w in overlays {
+            pinWindowToAllSpaces(w.window)
+            w.window.orderFrontRegardless()
+        }
+        for b in topBars {
+            pinWindowToAllSpaces(b.window)
+            b.window.orderFrontRegardless()
+        }
     }
 
     /// Apply a pixel offset to all overlay and top-bar windows.
@@ -453,7 +620,8 @@ final class OverlayController: ObservableObject {
     }
 
     private func tick() {
-        pixelShiftTick()
+        if hibernating { return }
+        if !lowPower { pixelShiftTick() }   // skip pixel shift in low-power mode
 
         let s = settings
         let opacity = CGFloat(s.opacity)
@@ -508,72 +676,46 @@ final class OverlayController: ObservableObject {
             return
         }
 
-        // Cursor warp detection — system cursor teleports during Mission
-        // Control / app switcher / etc.
-        let now = Date()
-        let m = NSEvent.mouseLocation
-        let dx = m.x - lastCursorPos.x
-        let dy = m.y - lastCursorPos.y
-        if (dx * dx + dy * dy).squareRoot() > 600 {
-            beginGracefulPulse()
-        }
-        lastCursorPos = m
-
-        // Frozen: pulse animation is running (fade-out → hold → fade-in).
-        if now < freezeUntil {
-            if overlays.contains(where: { $0.isVisible }) {
-                accrueProtectedTime()
-            }
-            updateState(.active(protectedCount: protectedCount))
-            return
-        }
-
         // Per-display media + cursor follow.
         let cursorID = cursorDisplayID()
         let mediaDisplays = s.pauseOnMedia ? mediaWatcher.displaysWithMedia : []
-        var anyDimmed = false
-        var mediaOnAnyProtected = false
         var mediaPausedDisplays = Set<CGDirectDisplayID>()
 
         for w in overlays {
-            let mediaHere = mediaDisplays.contains(w.displayID)
-            if mediaHere {
-                mediaOnAnyProtected = true
+            if mediaDisplays.contains(w.displayID) {
                 mediaPausedDisplays.insert(w.displayID)
-                // Hide because video is on THIS display.
                 if w.isVisible || w.hasPendingShow {
                     w.setVisible(false, opacity: opacity, duration: dur)
                 }
                 continue
             }
-
             if w.displayID == cursorID {
                 if w.isVisible || w.hasPendingShow {
                     w.setVisible(false, opacity: opacity, duration: dur)
                 }
-            } else {
-                if w.isVisible { anyDimmed = true }
-                if !w.isVisible && !w.hasPendingShow {
-                    let delay = s.leaveDelay
-                    w.scheduleShow(after: delay, opacity: opacity, duration: dur) { [weak self, weak w] in
-                        guard let self = self, let w = w else { return false }
-                        if self.settings.pauseOnMedia &&
-                           self.mediaWatcher.displaysWithMedia.contains(w.displayID) {
-                            return false
-                        }
-                        return self.cursorDisplayID() != w.displayID
+            } else if !w.isVisible && !w.hasPendingShow {
+                let delay = s.leaveDelay
+                w.scheduleShow(after: delay, opacity: opacity, duration: dur) { [weak self, weak w] in
+                    guard let self = self, let w = w else { return false }
+                    if self.settings.pauseOnMedia &&
+                       self.mediaWatcher.displaysWithMedia.contains(w.displayID) {
+                        return false
                     }
+                    return self.cursorDisplayID() != w.displayID
                 }
             }
         }
-        // Top bars: hide on displays where video is playing, normal cursor
-        // logic everywhere else.
-        showTopBars(forceHidden: mediaPausedDisplays)
-        if anyDimmed { accrueProtectedTime() }
 
-        // Status only goes "media paused" if video is on a *protected* display.
-        // Video on the laptop (unprotected) leaves us in `.active`.
-        if mediaOnAnyProtected && mediaPausedDisplays.count == overlays.count {
+        // Top bars: hide on displays with media, cursor-aware otherwise.
+        showTopBars(forceHidden: mediaPausedDisplays)
+        if overlays.contains(where: { $0.isVisible }) { accrueProtectedTime() }
+
+        // Status: only flip to "media paused" when *every* protected display
+        // is currently held hidden by video. A laptop video leaves us in
+        // `.active` because the protected (external) display is dimming
+        // normally per the cursor.
+        if !mediaPausedDisplays.isEmpty
+           && mediaPausedDisplays.count == overlays.count {
             updateState(.mediaPaused)
         } else {
             updateState(.active(protectedCount: protectedCount))
@@ -581,11 +723,16 @@ final class OverlayController: ObservableObject {
     }
 
     private func accrueProtectedTime() {
-        unsavedSeconds += 1.0/30.0
-        if Date().timeIntervalSince(lastSaved) > 5 {
+        let now = Date()
+        // Use real elapsed time, capped so a long sleep / pause doesn't
+        // dump huge numbers in one go.
+        let elapsed = min(0.5, now.timeIntervalSince(lastAccrualAt))
+        unsavedSeconds += elapsed
+        lastAccrualAt = now
+        if now.timeIntervalSince(lastSaved) > 5 {
             settings.totalProtectedSeconds += unsavedSeconds
             unsavedSeconds = 0
-            lastSaved = Date()
+            lastSaved = now
         }
     }
 }

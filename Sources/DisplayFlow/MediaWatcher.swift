@@ -15,10 +15,11 @@ final class MediaWatcher: ObservableObject {
     private(set) var idleSeconds: Double = 0
 
     private var timer: Timer?
+    private(set) var pollInterval: TimeInterval = 2.0
 
     func start() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
             self?.poll()
         }
         poll()
@@ -29,33 +30,58 @@ final class MediaWatcher: ObservableObject {
         timer = nil
     }
 
+    /// Adjusts the polling cadence — used to slow down in low-power mode.
+    func setPollInterval(_ seconds: TimeInterval) {
+        guard seconds != pollInterval else { return }
+        pollInterval = seconds
+        if timer != nil { start() }
+    }
+
     private func poll() {
-        let displays = Self.queryDisplaysWithMedia()
-        let any = !displays.isEmpty
+        // Decouple the two signals:
+        //  - mediaPlaying = "any process holds a display-sleep assertion".
+        //    Used to skip idle blackout while *something* is playing, even
+        //    if we can't say where.
+        //  - displaysWithMedia = a conservative per-display attribution.
+        //    Only contains displays we're confident about; an ambiguous PID
+        //    (windows on multiple displays) contributes nothing, so the
+        //    cursor-follow loop is free to dim the protected display.
+        let pids = Self.videoHoldingPIDs()
+        let displays = Self.queryDisplaysWithMedia(pids: pids)
         let idle = Self.systemIdleSeconds()
+        let any = !pids.isEmpty
         if displaysWithMedia != displays { displaysWithMedia = displays }
         if mediaPlaying != any { mediaPlaying = any }
         idleSeconds = idle
     }
 
-    /// PIDs that hold an active "PreventUserIdleDisplaySleep" or
-    /// "NoDisplaySleepAssertion" — the assertions video players, browsers
-    /// playing video, and video-call apps create. Audio-only apps don't.
+    /// PIDs of GUI apps (regular activation policy) that hold an active
+    /// display-sleep assertion. Filtering to GUI apps keeps background
+    /// daemons that hold long-lived assertions (audio routers, system
+    /// services) from being mistaken for media.
     static func videoHoldingPIDs() -> Set<pid_t> {
         var dict: Unmanaged<CFDictionary>?
         guard IOPMCopyAssertionsByProcess(&dict) == kIOReturnSuccess,
               let byProcess = dict?.takeRetainedValue() as? [Int: NSArray]
         else { return [] }
 
+        // Only consider apps that show in the Dock — that's where actual
+        // playable media lives. Hidden helpers and daemons get filtered out.
+        let guiPids: Set<pid_t> = Set(NSWorkspace.shared.runningApplications.compactMap { app in
+            app.activationPolicy == .regular ? app.processIdentifier : nil
+        })
+
         var pids = Set<pid_t>()
         for (pid, raw) in byProcess {
+            let p = pid_t(pid)
+            guard guiPids.contains(p) else { continue }
             guard let assertions = raw as? [[String: Any]] else { continue }
             for a in assertions {
                 let level = (a["AssertLevel"] as? Int) ?? 0
                 guard level > 0 else { continue }
                 let type = (a["AssertType"] as? String) ?? ""
                 if type == "PreventUserIdleDisplaySleep" || type == "NoDisplaySleepAssertion" {
-                    pids.insert(pid_t(pid))
+                    pids.insert(p)
                     break
                 }
             }
@@ -63,40 +89,71 @@ final class MediaWatcher: ObservableObject {
         return pids
     }
 
-    /// Cross-references video-holding PIDs against the on-screen window list
-    /// to figure out which physical displays actually host visible video
-    /// content. The window's bounds are in CG global space (top-left origin),
-    /// same as `CGDisplayBounds(displayID)`, so direct intersection works.
+    /// Cross-references video-holding PIDs against the on-screen window list.
+    /// **Conservative**: only attribute to a display when ALL of the PID's
+    /// real windows live on that display. If a PID straddles multiple
+    /// displays we can't tell which has the video without inspecting page
+    /// content, so we attribute to none. The cursor-follow loop then dims
+    /// the protected display normally — better default than incorrectly
+    /// pausing it.
     static func queryDisplaysWithMedia() -> Set<CGDirectDisplayID> {
-        let pids = videoHoldingPIDs()
+        queryDisplaysWithMedia(pids: videoHoldingPIDs())
+    }
+
+    static func queryDisplaysWithMedia(pids: Set<pid_t>) -> Set<CGDirectDisplayID> {
         if pids.isEmpty { return [] }
 
         let opts: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard let windows = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]]
         else { return [] }
 
-        var result = Set<CGDirectDisplayID>()
+        let displayBounds: [(CGDirectDisplayID, CGRect)] = NSScreen.screens.compactMap { screen in
+            let key = NSDeviceDescriptionKey("NSScreenNumber")
+            guard let did = (screen.deviceDescription[key] as? NSNumber)?.uint32Value
+            else { return nil }
+            return (did, CGDisplayBounds(did))
+        }
+
+        func displayContaining(_ rect: CGRect) -> CGDirectDisplayID? {
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            for (did, dRect) in displayBounds where dRect.contains(center) {
+                return did
+            }
+            return nil
+        }
+
+        // Group qualifying windows by PID.
+        var windowsByPid: [pid_t: [CGRect]] = [:]
         for w in windows {
             guard let pid = w[kCGWindowOwnerPID as String] as? pid_t,
                   pids.contains(pid),
-                  let bounds = w[kCGWindowBounds as String] as? [String: NSNumber] else { continue }
+                  let bounds = w[kCGWindowBounds as String] as? [String: NSNumber]
+            else { continue }
+            let layer = (w[kCGWindowLayer as String] as? Int) ?? 0
+            if layer != 0 { continue }
+            if let alpha = w[kCGWindowAlpha as String] as? Double, alpha < 0.5 { continue }
             let x = bounds["X"]?.doubleValue ?? 0
             let y = bounds["Y"]?.doubleValue ?? 0
             let width = bounds["Width"]?.doubleValue ?? 0
             let height = bounds["Height"]?.doubleValue ?? 0
-            // Filter out tiny utility/system windows
-            if width < 100 || height < 100 { continue }
-            // Skip windows with very low alpha (likely overlays of our own kind)
-            if let alpha = w[kCGWindowAlpha as String] as? Double, alpha < 0.5 { continue }
+            // PIP windows can be ~320×180, full app windows much bigger.
+            if width < 200 || height < 150 { continue }
+            windowsByPid[pid, default: []].append(
+                CGRect(x: x, y: y, width: width, height: height))
+        }
 
-            let rect = CGRect(x: x, y: y, width: width, height: height)
-            for screen in NSScreen.screens {
-                let key = NSDeviceDescriptionKey("NSScreenNumber")
-                guard let did = (screen.deviceDescription[key] as? NSNumber)?.uint32Value
-                else { continue }
-                if CGDisplayBounds(did).intersects(rect) {
-                    result.insert(did)
-                }
+        var result = Set<CGDirectDisplayID>()
+        for (_, rects) in windowsByPid {
+            var touched = Set<CGDirectDisplayID>()
+            for r in rects {
+                if let did = displayContaining(r) { touched.insert(did) }
+            }
+            // Only commit when unambiguous: all the PID's windows are on a
+            // single display. If the PID has windows on both screens we
+            // can't tell which one has the video, so we stay out of the
+            // cursor-follow loop's way and let it dim normally.
+            if touched.count == 1 {
+                result.formUnion(touched)
             }
         }
         return result

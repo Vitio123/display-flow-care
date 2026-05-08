@@ -28,18 +28,21 @@ final class MenuBarController: NSObject {
     private func rebuild() {
         let s = Settings.shared
 
-        let symbol: String
+        // Custom icon for the active baseline (the most-seen state). Other
+        // states get a more communicative SF Symbol so the bar telegraphs
+        // why we're paused.
+        let icon: NSImage?
         switch controller.state {
-        case .disabled:     symbol = "moon.zzz"
-        case .noDisplays:   symbol = "exclamationmark.triangle"
-        case .manualRest:   symbol = "moon.fill"
-        case .scheduled:    symbol = "clock.fill"
-        case .mediaPaused:  symbol = "play.rectangle.fill"
-        case .idleBlackout: symbol = "bed.double.fill"
-        case .active:       symbol = "rectangle.on.rectangle"
+        case .disabled:     icon = NSImage(systemSymbolName: "moon.zzz", accessibilityDescription: "Display Flow")
+        case .hibernating:  icon = NSImage(systemSymbolName: "powerplug.fill", accessibilityDescription: "Display Flow")
+        case .noDisplays:   icon = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: "Display Flow")
+        case .manualRest:   icon = NSImage(systemSymbolName: "moon.fill", accessibilityDescription: "Display Flow")
+        case .scheduled:    icon = NSImage(systemSymbolName: "clock.fill", accessibilityDescription: "Display Flow")
+        case .mediaPaused:  icon = NSImage(systemSymbolName: "play.rectangle.fill", accessibilityDescription: "Display Flow")
+        case .idleBlackout: icon = NSImage(systemSymbolName: "bed.double.fill", accessibilityDescription: "Display Flow")
+        case .active:       icon = MenuBarController.brandIcon()
         }
-        statusItem.button?.image = NSImage(systemSymbolName: symbol,
-                                           accessibilityDescription: "Display Flow")
+        statusItem.button?.image = icon
 
         let menu = NSMenu()
 
@@ -78,6 +81,12 @@ final class MenuBarController: NSObject {
         let s = Settings.shared
         switch controller.state {
         case .disabled:                  return s.t(.statusPaused)
+        case .hibernating:
+            switch controller.hibernationReason {
+            case .noExternalDisplay:    return "\(s.t(.statusHibernating)) — \(s.t(.subHibernateNoExternal))"
+            case .manualBatterySaver:   return "\(s.t(.statusHibernating)) — \(s.t(.subHibernateBatterySaver))"
+            case .lowBattery:           return "\(s.t(.statusHibernating)) — \(s.t(.subHibernateLowBattery))"
+            }
         case .noDisplays:                return s.t(.statusNoDisplaysShort)
         case .manualRest:                return s.t(.statusManualRest)
         case .scheduled:                 return s.t(.statusScheduled)
@@ -91,11 +100,64 @@ final class MenuBarController: NSObject {
 
     @objc private func toggleEnabled() { Settings.shared.enabled.toggle() }
     @objc private func toggleRest()    { Settings.shared.manualRest.toggle() }
-    @objc private func showPrefs() {
+    @objc private func showPrefs()     { showPreferences() }
+
+    /// Used by the AppDelegate when the user clicks the Dock icon.
+    func showPreferences() {
         if prefs == nil {
             prefs = PreferencesWindowController(controller: controller)
         }
         prefs?.show()
+    }
+
+    /// Custom monochrome menu-bar icon — a stylized monitor with a small
+    /// crescent moon inside (sleep / dim). Drawn as a template image so the
+    /// system tints it correctly for light, dark, and inverted menu bars.
+    static func brandIcon() -> NSImage {
+        let size = NSSize(width: 19, height: 19)
+        let image = NSImage(size: size, flipped: false) { _ in
+            // Display body
+            let dRect = NSRect(x: 1.5, y: 5, width: 16, height: 10)
+            let body = NSBezierPath(roundedRect: dRect, xRadius: 1.8, yRadius: 1.8)
+            body.lineWidth = 1.4
+            NSColor.black.setStroke()
+            body.stroke()
+
+            // Stand neck
+            let neck = NSBezierPath()
+            neck.move(to: NSPoint(x: 7,    y: 5))
+            neck.line(to: NSPoint(x: 6.5,  y: 2.5))
+            neck.line(to: NSPoint(x: 12.5, y: 2.5))
+            neck.line(to: NSPoint(x: 12,   y: 5))
+            neck.lineWidth = 1.4
+            neck.lineCapStyle = .round
+            neck.lineJoinStyle = .round
+            neck.stroke()
+
+            // Stand base
+            let base = NSBezierPath()
+            base.move(to: NSPoint(x: 5,  y: 1.7))
+            base.line(to: NSPoint(x: 14, y: 1.7))
+            base.lineWidth = 1.4
+            base.lineCapStyle = .round
+            base.stroke()
+
+            // Crescent moon inside (sleep cue) — boolean of two circles via
+            // the even-odd winding rule.
+            let r: CGFloat = 2.5
+            let cx: CGFloat = 11.5
+            let cy: CGFloat = 10
+            let outer = NSBezierPath(ovalIn: NSRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+            let cut   = NSBezierPath(ovalIn: NSRect(x: cx - r + 1.4, y: cy - r, width: r * 2, height: r * 2))
+            outer.append(cut)
+            outer.windingRule = .evenOdd
+            NSColor.black.setFill()
+            outer.fill()
+
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 }
 
@@ -123,13 +185,10 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     required init?(coder: NSCoder) { fatalError() }
 
     func show() {
-        NSApp.setActivationPolicy(.regular)
+        // Activation policy is `.regular` for the whole lifetime now (the
+        // app shows in the Dock), so we just bring the window forward.
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
-    }
-
-    func windowWillClose(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
     }
 }
 
@@ -141,20 +200,46 @@ struct PreferencesView: View {
     @EnvironmentObject var controller: OverlayController
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header
-                statusCard
-                section(settings.t(.sectionDisplays)) { displaysContent }
-                section(settings.t(.sectionAppearance)) { appearanceContent }
-                section(settings.t(.sectionCare)) { careContent }
-                section(settings.t(.sectionSchedule)) { scheduleContent }
-                section(settings.t(.sectionLanguage)) { languageContent }
-                footer
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    header
+                    statusCard
+                    section(settings.t(.sectionDisplays)) { displaysContent }
+                    section(settings.t(.sectionAppearance)) { appearanceContent }
+                    section(settings.t(.sectionCare)) { careContent }
+                    section(settings.t(.sectionPower)) { powerContent }
+                    section(settings.t(.sectionSchedule)) { scheduleContent }
+                    section(settings.t(.sectionLanguage)) { languageContent }
+                    footer
+                }
+                .padding(.horizontal, 28)
+                .padding(.top, 28)
+                .padding(.bottom, 18)
             }
-            .padding(28)
+
+            // Sticky footer bar with the Apply / Done button. Sits flush with
+            // the window edge with a hairline divider so the scroll content
+            // visually tucks behind it.
+            VStack(spacing: 0) {
+                Divider().opacity(0.5)
+                HStack {
+                    Spacer()
+                    Button(action: closeWindow) {
+                        Text(settings.t(.applyAndClose))
+                            .fontWeight(.semibold)
+                            .frame(minWidth: 80)
+                    }
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(.horizontal, 22)
+                .padding(.vertical, 14)
+            }
+            .background(.ultraThinMaterial)
         }
-        .frame(minWidth: 500, idealWidth: 500, minHeight: 600, idealHeight: 760)
+        .frame(minWidth: 520, idealWidth: 520, minHeight: 620, idealHeight: 780)
         .background(
             LinearGradient(
                 colors: [Color(NSColor.windowBackgroundColor),
@@ -166,6 +251,11 @@ struct PreferencesView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: settings.scheduleEnabled)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: settings.manualRest)
         .animation(.easeInOut(duration: 0.3), value: controller.state)
+    }
+
+    private func closeWindow() {
+        // Settings already apply live, so this just dismisses the window.
+        NSApplication.shared.keyWindow?.performClose(nil)
     }
 
     // MARK: Header
@@ -254,6 +344,16 @@ struct PreferencesView: View {
             return .init(text: settings.t(.statusPaused),
                          subtitle: settings.t(.subPaused),
                          symbol: "pause.circle.fill", color: .orange)
+        case .hibernating:
+            let sub: String
+            switch controller.hibernationReason {
+            case .noExternalDisplay:  sub = settings.t(.subHibernateNoExternal)
+            case .manualBatterySaver: sub = settings.t(.subHibernateBatterySaver)
+            case .lowBattery:         sub = settings.t(.subHibernateLowBattery)
+            }
+            return .init(text: settings.t(.statusHibernating),
+                         subtitle: sub,
+                         symbol: "powerplug.fill", color: .gray)
         case .noDisplays:
             return .init(text: settings.t(.statusIdle),
                          subtitle: settings.t(.subNoDisplays),
@@ -420,6 +520,51 @@ struct PreferencesView: View {
             .controlSize(.large)
             .buttonStyle(.borderedProminent)
             .tint(settings.manualRest ? .blue : .indigo)
+        }
+    }
+
+    // MARK: Power
+
+    private var powerContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: Binding(
+                get: { settings.launchAtLoginEnabled },
+                set: { _ = settings.setLaunchAtLogin($0) }
+            )) {
+                careRow(symbol: "power",
+                        title: settings.t(.careLaunchAtLoginTitle),
+                        subtitle: settings.t(.careLaunchAtLoginSubtitle))
+            }
+            .toggleStyle(.switch)
+
+            Divider().opacity(0.4)
+
+            Toggle(isOn: $settings.batterySaverMode) {
+                careRow(symbol: "leaf.fill",
+                        title: settings.t(.careBatterySaverTitle),
+                        subtitle: settings.t(.careBatterySaverSubtitle))
+            }
+            .toggleStyle(.switch)
+
+            Divider().opacity(0.4)
+
+            Toggle(isOn: $settings.autoBatterySaverWhenLow) {
+                careRow(symbol: "battery.25",
+                        title: settings.t(.careAutoBatterySaverTitle),
+                        subtitle: settings.t(.careAutoBatterySaverSubtitle))
+            }
+            .toggleStyle(.switch)
+
+            Divider().opacity(0.4)
+
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                Text(settings.t(.powerNoExternalNote))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
         }
     }
 

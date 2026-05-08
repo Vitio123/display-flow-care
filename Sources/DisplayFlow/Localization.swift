@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Languages
 
 enum AppLanguage: String, CaseIterable, Identifiable {
-    case en, es, pt, de, it, ja, zh, ko
+    case en, es, pt, fr, de, it, ja, zh, ko
     var id: String { rawValue }
 
     var nativeName: String {
@@ -11,6 +11,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .en: return "English"
         case .es: return "Español"
         case .pt: return "Português"
+        case .fr: return "Français"
         case .de: return "Deutsch"
         case .it: return "Italiano"
         case .ja: return "日本語"
@@ -24,6 +25,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .en: return "🇺🇸"
         case .es: return "🇪🇸"
         case .pt: return "🇧🇷"
+        case .fr: return "🇫🇷"
         case .de: return "🇩🇪"
         case .it: return "🇮🇹"
         case .ja: return "🇯🇵"
@@ -72,6 +74,20 @@ enum LocKey: String {
     case totalProtected, unitHourMin, unitMin, unitSec
 
     case menuPause, menuResume, menuPreferences, menuQuit
+
+    // Hibernation / battery saver
+    case statusHibernating
+    case subHibernateNoExternal, subHibernateBatterySaver, subHibernateLowBattery
+    case sectionPower
+    case careBatterySaverTitle, careBatterySaverSubtitle
+    case careAutoBatterySaverTitle, careAutoBatterySaverSubtitle
+    case powerNoExternalNote
+
+    // Launch at login
+    case careLaunchAtLoginTitle, careLaunchAtLoginSubtitle
+
+    // Sticky footer
+    case applyAndClose
 }
 
 // MARK: - Translations
@@ -143,6 +159,19 @@ private let strings: [AppLanguage: [LocKey: String]] = [
     .menuResume: "Resume Display Flow",
     .menuPreferences: "Preferences…",
     .menuQuit: "Quit Display Flow",
+    .statusHibernating: "Hibernating",
+    .subHibernateNoExternal: "No external display connected",
+    .subHibernateBatterySaver: "Battery saver mode is on",
+    .subHibernateLowBattery: "Battery is below 50%",
+    .sectionPower: "Power",
+    .careBatterySaverTitle: "Battery saver mode",
+    .careBatterySaverSubtitle: "Pause everything and free all resources.",
+    .careAutoBatterySaverTitle: "Auto-pause below 50% battery",
+    .careAutoBatterySaverSubtitle: "Stop monitoring when on battery and getting low.",
+    .powerNoExternalNote: "Always pauses when no external display is connected.",
+    .careLaunchAtLoginTitle: "Open at login",
+    .careLaunchAtLoginSubtitle: "Start Display Flow automatically when you sign in to your Mac.",
+    .applyAndClose: "Apply",
 ],
 
 .es: [
@@ -210,6 +239,19 @@ private let strings: [AppLanguage: [LocKey: String]] = [
     .menuResume: "Reanudar Display Flow",
     .menuPreferences: "Preferencias…",
     .menuQuit: "Salir de Display Flow",
+    .statusHibernating: "Hibernando",
+    .subHibernateNoExternal: "No hay pantalla externa conectada",
+    .subHibernateBatterySaver: "Modo ahorro de batería activo",
+    .subHibernateLowBattery: "Batería por debajo del 50%",
+    .sectionPower: "Energía",
+    .careBatterySaverTitle: "Modo ahorro de batería",
+    .careBatterySaverSubtitle: "Pausa todo y libera los recursos del sistema.",
+    .careAutoBatterySaverTitle: "Pausar automáticamente bajo 50%",
+    .careAutoBatterySaverSubtitle: "Detiene el monitoreo cuando estás con batería y está bajando.",
+    .powerNoExternalNote: "Siempre pausa cuando no hay pantalla externa conectada.",
+    .careLaunchAtLoginTitle: "Abrir al iniciar sesión",
+    .careLaunchAtLoginSubtitle: "Inicia Display Flow automáticamente cuando enciendas tu Mac.",
+    .applyAndClose: "Aplicar",
 ],
 
 .pt: [
@@ -277,6 +319,99 @@ private let strings: [AppLanguage: [LocKey: String]] = [
     .menuResume: "Retomar Display Flow",
     .menuPreferences: "Preferências…",
     .menuQuit: "Sair do Display Flow",
+    .statusHibernating: "Hibernando",
+    .subHibernateNoExternal: "Nenhuma tela externa conectada",
+    .subHibernateBatterySaver: "Modo economia de bateria ativo",
+    .subHibernateLowBattery: "Bateria abaixo de 50%",
+    .sectionPower: "Energia",
+    .careBatterySaverTitle: "Modo economia de bateria",
+    .careBatterySaverSubtitle: "Pausa tudo e libera todos os recursos.",
+    .careAutoBatterySaverTitle: "Pausar automaticamente abaixo de 50%",
+    .careAutoBatterySaverSubtitle: "Para o monitoramento quando estiver na bateria e ela estiver baixa.",
+    .powerNoExternalNote: "Sempre pausa quando não há tela externa conectada.",
+    .careLaunchAtLoginTitle: "Abrir ao iniciar sessão",
+    .careLaunchAtLoginSubtitle: "Inicia o Display Flow automaticamente quando você liga o Mac.",
+    .applyAndClose: "Aplicar",
+],
+
+.fr: [
+    .appSubtitle: "Protection contre l'effet rémanent pour votre moniteur",
+    .statusPaused: "En pause",
+    .statusNoDisplaysShort: "Aucun écran sélectionné",
+    .statusManualRest: "Écrans en repos",
+    .statusScheduled: "Repos selon l'horaire",
+    .statusMediaPaused: "En pause — une vidéo est en cours",
+    .statusIdleBlackout: "Écran noir — système inactif",
+    .statusActiveOne: "Actif — protection de 1 écran",
+    .statusActiveMany: "Actif — protection de %d écrans",
+    .statusIdle: "Inactif — aucun écran sélectionné",
+    .subPaused: "Display Flow est désactivé",
+    .subNoDisplays: "Activez un écran ci-dessous pour commencer",
+    .subManualRest: "Cliquez sur Réveiller les écrans pour reprendre",
+    .subScheduled: "La fenêtre de repos automatique est active",
+    .subMediaPaused: "Reprendra à l'arrêt de la lecture",
+    .subIdleBlackout: "Se réveille à toute saisie",
+    .subActive: "Déplacez votre curseur entre les écrans",
+    .sectionDisplays: "Écrans",
+    .sectionAppearance: "Apparence",
+    .sectionCare: "Protection",
+    .sectionSchedule: "Horaire",
+    .sectionLanguage: "Langue",
+    .noDisplaysDetected: "Aucun écran détecté.",
+    .badgeExternal: "EXTERNE",
+    .displayBuiltin: "Intégré",
+    .displayExternal: "Externe",
+    .displayProtected: "Protégé",
+    .displayNotProtected: "Non protégé",
+    .style: "Style",
+    .styleBlack: "Noir",
+    .styleWhite: "Blanc",
+    .styleBlur: "Flou",
+    .opacity: "Opacité",
+    .fadeSpeed: "Vitesse du fondu",
+    .fadeInstant: "Instantané",
+    .leaveDelay: "Délai de sortie",
+    .leaveNone: "Aucun",
+    .previewLabel: "Votre écran",
+    .carePauseMediaTitle: "Mettre en pause quand une vidéo est à l'écran",
+    .carePauseMediaSubtitle: "Plein écran, picture-in-picture, ou dans un onglet — toute vidéo visible. Les apps audio uniquement (musique, appels vocaux) ne mettent pas en pause.",
+    .carePixelShiftTitle: "Décalage de pixels",
+    .carePixelShiftSubtitle: "Décale subtilement le calque de ±1 pixel chaque minute pour que le cache de la barre des menus n'occupe pas toujours les mêmes pixels physiques.",
+    .careBlackoutIdleTitle: "Écran noir sur les écrans protégés en cas d'inactivité",
+    .careBlackoutIdleSubtitle: "Après une période sans saisie, couvre entièrement les écrans protégés.",
+    .idleThreshold: "Seuil d'inactivité",
+    .minute_1: "1 minute",
+    .minutes_2: "2 minutes",
+    .minutes_5: "5 minutes",
+    .minutes_10: "10 minutes",
+    .minutes_30: "30 minutes",
+    .wakeDisplays: "Réveiller les écrans",
+    .restDisplaysNow: "Mettre les écrans en repos",
+    .scheduleTitle: "Repos automatique selon l'horaire",
+    .scheduleSubtitle: "Forcer le repos des écrans protégés pendant les heures définies.",
+    .scheduleFrom: "De",
+    .scheduleTo: "à",
+    .totalProtected: "Temps total protégé : %@",
+    .unitHourMin: "%dh %dmin",
+    .unitMin: "%dmin",
+    .unitSec: "%ds",
+    .menuPause: "Suspendre Display Flow",
+    .menuResume: "Reprendre Display Flow",
+    .menuPreferences: "Préférences…",
+    .menuQuit: "Quitter Display Flow",
+    .statusHibernating: "En veille",
+    .subHibernateNoExternal: "Aucun écran externe connecté",
+    .subHibernateBatterySaver: "Mode économie d'énergie activé",
+    .subHibernateLowBattery: "Batterie inférieure à 50 %",
+    .sectionPower: "Énergie",
+    .careBatterySaverTitle: "Mode économie d'énergie",
+    .careBatterySaverSubtitle: "Mettre tout en pause et libérer toutes les ressources.",
+    .careAutoBatterySaverTitle: "Pause automatique sous 50 % de batterie",
+    .careAutoBatterySaverSubtitle: "Arrête la surveillance lorsque vous êtes sur batterie et qu'elle baisse.",
+    .powerNoExternalNote: "Se met toujours en pause quand aucun écran externe n'est connecté.",
+    .careLaunchAtLoginTitle: "Ouvrir à l'ouverture de session",
+    .careLaunchAtLoginSubtitle: "Lance Display Flow automatiquement quand vous vous connectez à votre Mac.",
+    .applyAndClose: "Appliquer",
 ],
 
 .de: [
@@ -344,6 +479,19 @@ private let strings: [AppLanguage: [LocKey: String]] = [
     .menuResume: "Display Flow fortsetzen",
     .menuPreferences: "Einstellungen…",
     .menuQuit: "Display Flow beenden",
+    .statusHibernating: "Im Ruhezustand",
+    .subHibernateNoExternal: "Kein externer Bildschirm angeschlossen",
+    .subHibernateBatterySaver: "Energiesparmodus aktiv",
+    .subHibernateLowBattery: "Akku unter 50%",
+    .sectionPower: "Energie",
+    .careBatterySaverTitle: "Energiesparmodus",
+    .careBatterySaverSubtitle: "Pausiert alles und gibt sämtliche Ressourcen frei.",
+    .careAutoBatterySaverTitle: "Unter 50% Akku automatisch pausieren",
+    .careAutoBatterySaverSubtitle: "Stoppt die Überwachung im Akkubetrieb bei niedrigem Stand.",
+    .powerNoExternalNote: "Pausiert immer, wenn kein externer Bildschirm angeschlossen ist.",
+    .careLaunchAtLoginTitle: "Beim Anmelden öffnen",
+    .careLaunchAtLoginSubtitle: "Display Flow automatisch starten, wenn du dich an deinem Mac anmeldest.",
+    .applyAndClose: "Übernehmen",
 ],
 
 .it: [
@@ -411,6 +559,19 @@ private let strings: [AppLanguage: [LocKey: String]] = [
     .menuResume: "Riprendi Display Flow",
     .menuPreferences: "Preferenze…",
     .menuQuit: "Esci da Display Flow",
+    .statusHibernating: "In ibernazione",
+    .subHibernateNoExternal: "Nessun display esterno collegato",
+    .subHibernateBatterySaver: "Modalità risparmio energetico attiva",
+    .subHibernateLowBattery: "Batteria sotto il 50%",
+    .sectionPower: "Energia",
+    .careBatterySaverTitle: "Modalità risparmio energetico",
+    .careBatterySaverSubtitle: "Mette tutto in pausa e libera le risorse.",
+    .careAutoBatterySaverTitle: "Pausa automatica sotto il 50% di batteria",
+    .careAutoBatterySaverSubtitle: "Interrompe il monitoraggio quando sei a batteria e sta calando.",
+    .powerNoExternalNote: "Si mette sempre in pausa quando non c'è un display esterno collegato.",
+    .careLaunchAtLoginTitle: "Apri all'accesso",
+    .careLaunchAtLoginSubtitle: "Avvia Display Flow automaticamente quando accedi al tuo Mac.",
+    .applyAndClose: "Applica",
 ],
 
 .ja: [
@@ -478,6 +639,19 @@ private let strings: [AppLanguage: [LocKey: String]] = [
     .menuResume: "Display Flow を再開",
     .menuPreferences: "環境設定…",
     .menuQuit: "Display Flow を終了",
+    .statusHibernating: "休止中",
+    .subHibernateNoExternal: "外部ディスプレイが接続されていません",
+    .subHibernateBatterySaver: "バッテリーセーバーモード",
+    .subHibernateLowBattery: "バッテリー残量が 50% 未満です",
+    .sectionPower: "電源",
+    .careBatterySaverTitle: "バッテリーセーバーモード",
+    .careBatterySaverSubtitle: "すべて一時停止し、リソースを解放します。",
+    .careAutoBatterySaverTitle: "バッテリー 50% 未満で自動停止",
+    .careAutoBatterySaverSubtitle: "バッテリー駆動で残量が少なくなったら監視を停止します。",
+    .powerNoExternalNote: "外部ディスプレイが接続されていないときは常に一時停止します。",
+    .careLaunchAtLoginTitle: "ログイン時に起動",
+    .careLaunchAtLoginSubtitle: "Mac にサインインしたときに Display Flow を自動的に起動します。",
+    .applyAndClose: "適用",
 ],
 
 .zh: [
@@ -545,6 +719,19 @@ private let strings: [AppLanguage: [LocKey: String]] = [
     .menuResume: "恢复 Display Flow",
     .menuPreferences: "偏好设置…",
     .menuQuit: "退出 Display Flow",
+    .statusHibernating: "已休眠",
+    .subHibernateNoExternal: "未连接外接显示器",
+    .subHibernateBatterySaver: "省电模式已开启",
+    .subHibernateLowBattery: "电量低于 50%",
+    .sectionPower: "电源",
+    .careBatterySaverTitle: "省电模式",
+    .careBatterySaverSubtitle: "暂停所有功能并释放系统资源。",
+    .careAutoBatterySaverTitle: "电量低于 50% 时自动暂停",
+    .careAutoBatterySaverSubtitle: "在使用电池且电量较低时停止监测。",
+    .powerNoExternalNote: "未连接外接显示器时始终暂停。",
+    .careLaunchAtLoginTitle: "登录时启动",
+    .careLaunchAtLoginSubtitle: "登录 Mac 时自动启动 Display Flow。",
+    .applyAndClose: "应用",
 ],
 
 .ko: [
@@ -612,6 +799,19 @@ private let strings: [AppLanguage: [LocKey: String]] = [
     .menuResume: "Display Flow 재개",
     .menuPreferences: "환경설정…",
     .menuQuit: "Display Flow 종료",
+    .statusHibernating: "절전 중",
+    .subHibernateNoExternal: "외부 디스플레이가 연결되지 않았습니다",
+    .subHibernateBatterySaver: "배터리 절약 모드가 켜져 있습니다",
+    .subHibernateLowBattery: "배터리가 50% 미만입니다",
+    .sectionPower: "전원",
+    .careBatterySaverTitle: "배터리 절약 모드",
+    .careBatterySaverSubtitle: "모든 기능을 일시 중지하고 리소스를 해제합니다.",
+    .careAutoBatterySaverTitle: "배터리 50% 미만에서 자동 중지",
+    .careAutoBatterySaverSubtitle: "배터리 사용 중이고 잔량이 낮을 때 모니터링을 중지합니다.",
+    .powerNoExternalNote: "외부 디스플레이가 없으면 항상 일시 중지됩니다.",
+    .careLaunchAtLoginTitle: "로그인 시 실행",
+    .careLaunchAtLoginSubtitle: "Mac에 로그인하면 Display Flow를 자동으로 시작합니다.",
+    .applyAndClose: "적용",
 ],
 
 ]

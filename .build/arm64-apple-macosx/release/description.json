@@ -36,6 +36,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/PowerWatcher.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift"
         },
         {
@@ -62,13 +66,14 @@
         "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Localization.swift.o",
         "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/MediaWatcher.swift.o",
         "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.swift.o",
+        "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/PowerWatcher.swift.o",
         "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.swift.o",
         "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/UI.swift.o",
         "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/main.swift.o"
       ],
       "otherArguments" : [
         "-target",
-        "arm64-apple-macosx12.0",
+        "arm64-apple-macosx13.0",
         "-whole-module-optimization",
         "-num-threads",
         "8",
@@ -122,6 +127,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/PowerWatcher.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.swift.o"
         },
         {
@@ -142,6 +151,7 @@
         "/Users/vitio/display flow + care/Sources/DisplayFlow/Localization.swift",
         "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift",
         "/Users/vitio/display flow + care/Sources/DisplayFlow/Overlay.swift",
+        "/Users/vitio/display flow + care/Sources/DisplayFlow/PowerWatcher.swift",
         "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift",
         "/Users/vitio/display flow + care/Sources/DisplayFlow/UI.swift",
         "/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift"
@@ -164,13 +174,14 @@
       "/Users/vitio/display flow + care/Sources/DisplayFlow/Localization.swift",
       "/Users/vitio/display flow + care/Sources/DisplayFlow/MediaWatcher.swift",
       "/Users/vitio/display flow + care/Sources/DisplayFlow/Overlay.swift",
+      "/Users/vitio/display flow + care/Sources/DisplayFlow/PowerWatcher.swift",
       "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift",
       "/Users/vitio/display flow + care/Sources/DisplayFlow/UI.swift",
       "/Users/vitio/display flow + care/Sources/DisplayFlow/main.swift",
       "-I",
       "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/Modules",
       "-target",
-      "arm64-apple-macosx12.0",
+      "arm64-apple-macosx13.0",
       "-whole-module-optimization",
       "-num-threads",
       "8",
@@ -249,6 +260,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/PowerWatcher.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift"
         },
         {
@@ -280,6 +295,10 @@
         {
           "kind" : "file",
           "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/PowerWatcher.swift.o"
         },
         {
           "kind" : "file",

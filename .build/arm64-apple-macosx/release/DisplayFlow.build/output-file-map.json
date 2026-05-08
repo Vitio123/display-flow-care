@@ -22,6 +22,12 @@
     "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.swiftdeps",
     "diagnostics": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Overlay.dia"
   },
+  "/Users/vitio/display flow + care/Sources/DisplayFlow/PowerWatcher.swift": {
+    "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/PowerWatcher.swift.o",
+    "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/PowerWatcher~partial.swiftmodule",
+    "swift-dependencies": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/PowerWatcher.swiftdeps",
+    "diagnostics": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/PowerWatcher.dia"
+  },
   "/Users/vitio/display flow + care/Sources/DisplayFlow/Settings.swift": {
     "object": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings.swift.o",
     "swiftmodule": "/Users/vitio/display flow + care/.build/arm64-apple-macosx/release/DisplayFlow.build/Settings~partial.swiftmodule",
